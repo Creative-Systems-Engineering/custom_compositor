@@ -7,6 +7,7 @@ use smithay::{
     desktop::{Space, Window},
     input::{Seat, SeatHandler, SeatState},
     output::{Output, PhysicalProperties, Subpixel},
+    wayland::output::{OutputHandler, OutputManagerState},
     reexports::{
         calloop::{EventLoop, LoopSignal},
         wayland_server::{
@@ -48,6 +49,7 @@ pub struct WaylandServerState {
     pub shm_state: ShmState,
     pub dmabuf_state: DmabufState,
     pub dmabuf_global: DmabufGlobal,
+    pub output_manager_state: OutputManagerState,
     pub seat_state: SeatState<Self>,
     pub space: Space<Window>,
     pub clock: Clock<Monotonic>,
@@ -106,6 +108,9 @@ impl WaylandServer {
         
         let seat_state = SeatState::new();
         
+        // Initialize output manager with xdg-output support for multi-monitor configuration
+        let output_manager_state = OutputManagerState::new_with_xdg_output::<WaylandServerState>(&dh);
+        
         // Create default output (4K setup)
         let output = Output::new(
             "custom-compositor-output".to_string(),
@@ -139,6 +144,7 @@ impl WaylandServer {
             shm_state,
             dmabuf_state,
             dmabuf_global,
+            output_manager_state,
             seat_state,
             space,
             clock,
@@ -406,13 +412,21 @@ impl SeatHandler for WaylandServerState {
     }
     
     fn cursor_image(&mut self, _seat: &Seat<Self>, _image: smithay::input::pointer::CursorImageStatus) {
-        // TODO: Handle cursor image updates
+        debug!("Cursor image changed for seat");
+    }
+}
+
+// Output handler implementation for managing outputs
+impl OutputHandler for WaylandServerState {
+    fn output_bound(&mut self, _output: Output, _wl_output: smithay::reexports::wayland_server::protocol::wl_output::WlOutput) {
+        debug!("Output bound to client");
     }
 }
 
 // Delegate handlers to implementations
 smithay::delegate_compositor!(WaylandServerState);
 smithay::delegate_xdg_shell!(WaylandServerState);
+smithay::delegate_output!(WaylandServerState);
 smithay::delegate_shm!(WaylandServerState);
 smithay::delegate_dmabuf!(WaylandServerState);
 smithay::delegate_seat!(WaylandServerState);

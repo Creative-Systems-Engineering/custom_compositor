@@ -4,8 +4,8 @@
 
 ### Priority 1 - Core Functionality
 
-- [ ] **linux-dmabuf-v1** - Zero-copy GPU buffer sharing for performance
-- [ ] **xdg-output-unstable-v1** - Precise multi-monitor configuration
+- [x] **linux-dmabuf-v1** - Zero-copy GPU buffer sharing for performance ✅ COMPLETED
+- [x] **xdg-output-unstable-v1** - Precise multi-monitor configuration ✅ COMPLETED
 - [ ] **zwp-relative-pointer-v1** - 3D viewport navigation and gaming
 - [ ] **zwp-pointer-constraints-v1** - Precise mouse control for creative apps
 - [ ] **wl-drm** - Direct rendering manager integration
