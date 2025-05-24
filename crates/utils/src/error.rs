@@ -35,6 +35,12 @@ pub enum CompositorError {
     
     #[error("Runtime error: {0}")]
     Runtime(String),
+    
+    #[error("IPC error: {0}")]
+    Ipc(String),
+    
+    #[error("Configuration error: {0}")]
+    Configuration(String),
 }
 
 /// Specialized Result type for compositor operations
@@ -74,5 +80,15 @@ impl CompositorError {
     /// Create a new runtime error
     pub fn runtime(msg: impl Into<String>) -> Self {
         Self::Runtime(msg.into())
+    }
+    
+    /// Create a new IPC error
+    pub fn ipc(msg: impl Into<String>) -> Self {
+        Self::Ipc(msg.into())
+    }
+    
+    /// Create a new configuration error
+    pub fn configuration(msg: impl Into<String>) -> Self {
+        Self::Configuration(msg.into())
     }
 }

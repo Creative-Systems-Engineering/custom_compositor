@@ -1,7 +1,9 @@
 use compositor_utils::prelude::*;
 use vulkan_renderer::VulkanRenderer;
+use ash;
 
 use smithay::{
+    backend::allocator::Buffer,
     desktop::{Space, Window},
     input::{Seat, SeatHandler, SeatState},
     output::{Output, PhysicalProperties, Subpixel},
@@ -9,18 +11,19 @@ use smithay::{
         calloop::{EventLoop, LoopSignal},
         wayland_server::{
             backend::{ClientData, ClientId, DisconnectReason},
-            protocol::{wl_seat::WlSeat, wl_surface::WlSurface},
+            protocol::{wl_seat::WlSeat, wl_surface::WlSurface, wl_shm},
             Display, Resource,
         },
     },
     utils::{Clock, Monotonic, Serial},
     wayland::{
         buffer::BufferHandler,
-        compositor::{CompositorClientState, CompositorHandler, CompositorState, with_states},
+        compositor::{CompositorClientState, CompositorHandler, CompositorState, SurfaceAttributes, with_states},
+        dmabuf,
         shell::xdg::{
             PopupSurface, PositionerState, ToplevelSurface, XdgShellHandler, XdgShellState,
         },
-        shm::{ShmHandler, ShmState},
+        shm::{ShmHandler, ShmState, self},
         socket::ListeningSocketSource,
     },
 };
@@ -271,14 +274,79 @@ impl CompositorHandler for WaylandServerState {
         debug!("Surface committed: {:?}", surface.id());
         
         // Handle surface commits for rendering
-        with_states(surface, |_surface_data| {
-            // TODO: Implement proper buffer handling with current Smithay API
-            // For now, just log the commit
-            debug!("Surface committed with data, will handle buffer access in future implementation");
+        with_states(surface, |surface_data| {
+            let surface_attributes = surface_data.cached_state.get::<SurfaceAttributes>();
             
-            // TODO: Access buffer through proper surface state API
-            // TODO: Handle frame callbacks through proper API
-            // TODO: Send buffer data to renderer
+            // Check if there's a buffer
+            if let Some(buffer) = surface_attributes.buffer.as_ref() {
+                debug!("Surface buffer attached: {:?}", buffer);
+                
+                // Extract buffer data and send to renderer
+                let surface_id = surface.id().protocol_id() as u32;
+                
+                if let Ok(dmabuf) = dmabuf::get_dmabuf(&buffer) {
+                    debug!("DMA-BUF buffer: {}x{}, format: {:?}", 
+                           dmabuf.width(), dmabuf.height(), dmabuf.format());
+                    
+                    // TODO: Handle DMA-BUF conversion to renderer format
+                    warn!("DMA-BUF rendering not yet implemented");
+                    
+                } else if let Ok(shm_buffer) = shm::with_buffer_contents(&buffer, |data, len, spec| {
+                    debug!("SHM buffer: {}x{}, stride: {}, format: {:?}", 
+                           spec.width, spec.height, spec.stride, spec.format);
+                    
+                    // Create slice from raw pointer and length
+                    let buffer_data = unsafe { std::slice::from_raw_parts(data, len) };
+                    
+                    // Convert SHM buffer to vulkan format and update renderer
+                    if let Some(ref renderer) = self.renderer {
+                        if let Ok(mut renderer_guard) = renderer.try_lock() {
+                            // Convert SHM format to Vulkan format
+                            let vulkan_format = match spec.format {
+                                wl_shm::Format::Argb8888 => ash::vk::Format::B8G8R8A8_UNORM,
+                                wl_shm::Format::Xrgb8888 => ash::vk::Format::B8G8R8A8_UNORM,
+                                wl_shm::Format::Rgba8888 => ash::vk::Format::R8G8B8A8_UNORM,
+                                wl_shm::Format::Rgbx8888 => ash::vk::Format::R8G8B8A8_UNORM,
+                                _ => {
+                                    warn!("Unsupported SHM format: {:?}", spec.format);
+                                    ash::vk::Format::R8G8B8A8_UNORM
+                                }
+                            };
+                            
+                            // Update surface texture in renderer
+                            if let Err(e) = renderer_guard.update_surface_buffer(
+                                surface_id,
+                                buffer_data,
+                                spec.width.try_into().unwrap(),
+                                spec.height.try_into().unwrap(),
+                                vulkan_format,
+                            ) {
+                                error!("Failed to update surface buffer in renderer: {}", e);
+                            } else {
+                                debug!("Surface {} texture updated in renderer", surface_id);
+                            }
+                        } else {
+                            warn!("Could not lock renderer for surface update");
+                        }
+                    } else {
+                        debug!("No renderer available for surface buffer");
+                    }
+                    
+                    Ok(())
+                }) {
+                    debug!("SHM buffer processed successfully");
+                } else {
+                    warn!("Unknown buffer type attached to surface");
+                }
+            }
+            
+            // Handle frame callbacks
+            let frame_callbacks = surface_attributes.frame_callbacks.drain(..).collect::<Vec<_>>();
+            drop(surface_attributes); // Release the lock before using callbacks
+            
+            for callback in frame_callbacks {
+                callback.done(self.clock.now().as_millis() as u32);
+            }
         });
         
         // Schedule a repaint for this surface

@@ -162,7 +162,7 @@ impl Swapchain {
     }
     
     /// Acquire the next image for rendering
-    pub fn acquire_next_image(&mut self) -> Result<()> {
+    pub fn acquire_next_image(&mut self) -> Result<u32> {
         // Simplified - in real implementation would use semaphores
         let (image_index, _) = unsafe {
             self.swapchain_loader.acquire_next_image(
@@ -174,7 +174,7 @@ impl Swapchain {
         };
         
         self.current_image = image_index;
-        Ok(())
+        Ok(image_index)
     }
     
     /// Present the current image
@@ -201,7 +201,17 @@ impl Swapchain {
         self.extent
     }
     
-    /// Get format
+    /// Get swapchain images
+    pub fn images(&self) -> &Vec<vk::Image> {
+        &self.images
+    }
+    
+    /// Get swapchain image views  
+    pub fn image_views(&self) -> &Vec<vk::ImageView> {
+        &self.image_views
+    }
+    
+    /// Get swapchain format
     pub fn format(&self) -> vk::Format {
         self.format
     }

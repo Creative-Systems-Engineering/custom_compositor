@@ -15,7 +15,7 @@ pub mod api;
 /// Plugin system manager
 pub struct PluginSystem {
     plugins: HashMap<Uuid, LoadedPlugin>,
-    registry: registry::PluginRegistry,
+    _registry: registry::PluginRegistry, // Prefix with _ to indicate intentionally unused for now
 }
 
 /// Represents a loaded plugin
@@ -33,7 +33,7 @@ impl PluginSystem {
         
         Ok(Self {
             plugins: HashMap::new(),
-            registry: registry::PluginRegistry::new()?,
+            _registry: registry::PluginRegistry::new(),
         })
     }
     

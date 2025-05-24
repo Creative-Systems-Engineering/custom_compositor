@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::{broadcast, RwLock};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 use compositor_utils::error::CompositorError;
 
 /// Configuration errors
@@ -38,7 +38,7 @@ pub enum ConfigError {
 
 impl From<ConfigError> for CompositorError {
     fn from(err: ConfigError) -> Self {
-        CompositorError::Configuration(err.to_string())
+        CompositorError::configuration(err.to_string())
     }
 }
 
@@ -446,9 +446,9 @@ impl ConfigManager {
     
     /// Enable hot-reloading of configuration files
     pub async fn enable_hot_reload(&mut self) -> Result<()> {
-        let config_path = self.config_path.clone();
-        let config = self.config.clone();
-        let sender = self.change_sender.clone();
+        let _config_path = self.config_path.clone();
+        let _config = self.config.clone();
+        let _sender = self.change_sender.clone();
         
         let mut watcher = RecommendedWatcher::new(
             move |res: notify::Result<notify::Event>| {

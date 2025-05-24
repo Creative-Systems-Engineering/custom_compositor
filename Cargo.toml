@@ -57,6 +57,7 @@ smithay = { version = "0.6", features = ["backend_drm", "backend_libinput", "bac
 wayland-server = "0.31"
 wayland-protocols = "0.32"
 calloop = "0.14"
+drm-fourcc = "2.2"
 
 # Vulkan graphics
 ash = { version = "0.37", features = ["linked"] }

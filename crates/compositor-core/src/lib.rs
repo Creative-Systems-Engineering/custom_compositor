@@ -17,8 +17,9 @@ pub mod output;
 pub mod surface;
 pub mod backend;
 
-use wayland::WaylandServer;
-use backend::Backend;
+// Re-export core types
+pub use wayland::WaylandServer;
+pub use backend::Backend;
 
 /// Main compositor instance
 pub struct Compositor {

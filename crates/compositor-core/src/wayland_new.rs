@@ -1,7 +1,9 @@
 use compositor_utils::prelude::*;
 use vulkan_renderer::VulkanRenderer;
+use ash;
 
 use smithay::{
+    backend::allocator::Buffer,
     desktop::{Space, Window},
     input::{Seat, SeatHandler, SeatState},
     output::{Output, PhysicalProperties, Subpixel},
@@ -9,18 +11,19 @@ use smithay::{
         calloop::{EventLoop, LoopSignal},
         wayland_server::{
             backend::{ClientData, ClientId, DisconnectReason},
-            protocol::{wl_seat::WlSeat, wl_surface::WlSurface},
+            protocol::{wl_seat::WlSeat, wl_surface::WlSurface, wl_shm},
             Display, Resource,
         },
     },
     utils::{Clock, Monotonic, Serial},
     wayland::{
         buffer::BufferHandler,
-        compositor::{CompositorClientState, CompositorHandler, CompositorState, with_states},
+        compositor::{CompositorClientState, CompositorHandler, CompositorState, SurfaceAttributes, with_states},
+        dmabuf,
         shell::xdg::{
             PopupSurface, PositionerState, ToplevelSurface, XdgShellHandler, XdgShellState,
         },
-        shm::{ShmHandler, ShmState},
+        shm::{ShmHandler, ShmState, self},
         socket::ListeningSocketSource,
     },
 };
@@ -271,7 +274,7 @@ impl CompositorHandler for WaylandServerState {
         debug!("Surface committed: {:?}", surface.id());
         
         // Handle surface commits for rendering
-        with_states(surface, |_surface_data| {
+        with_states(surface, |surface_data| {
             // TODO: Implement proper buffer handling with current Smithay API
             // For now, just log the commit
             debug!("Surface committed with data, will handle buffer access in future implementation");

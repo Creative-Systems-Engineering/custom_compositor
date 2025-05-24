@@ -98,14 +98,14 @@ impl ProtocolHandler {
     /// Serialize a message for transmission
     pub fn serialize_message(&self, message: &IPCMessage) -> Result<Vec<u8>> {
         bincode::serialize(message).map_err(|e| {
-            CompositorError::IPC(format!("Serialization error: {}", e)).into()
+            CompositorError::ipc(format!("Serialization error: {}", e)).into()
         })
     }
     
     /// Deserialize a message from bytes
     pub fn deserialize_message(&self, data: &[u8]) -> Result<IPCMessage> {
         bincode::deserialize(data).map_err(|e| {
-            CompositorError::IPC(format!("Deserialization error: {}", e)).into()
+            CompositorError::ipc(format!("Deserialization error: {}", e)).into()
         })
     }
 }

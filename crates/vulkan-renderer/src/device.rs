@@ -4,6 +4,7 @@ use crate::instance::VulkanInstance;
 use std::ffi::CStr;
 
 /// Vulkan logical device wrapper
+#[derive(Clone)]
 pub struct VulkanDevice {
     physical_device: vk::PhysicalDevice,
     device: Device,

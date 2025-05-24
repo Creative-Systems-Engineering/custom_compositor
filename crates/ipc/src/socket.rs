@@ -5,7 +5,7 @@
 
 use compositor_utils::prelude::*;
 use tokio::net::{UnixListener, UnixStream};
-use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
+use tokio_util::codec::{FramedWrite, LengthDelimitedCodec};
 use bytes::Bytes;
 use std::path::Path;
 
@@ -47,7 +47,7 @@ impl SocketServer {
             let (stream, _) = listener.accept().await?;
             Ok(stream)
         } else {
-            Err(CompositorError::IPC("Socket server not started".into()).into())
+            Err(CompositorError::ipc("Socket server not started").into())
         }
     }
 }
@@ -71,13 +71,13 @@ impl SocketClient {
     }
     
     /// Send data to the compositor
-    pub async fn send(&mut self, data: Bytes) -> Result<()> {
+    pub async fn send(&mut self, _data: Bytes) -> Result<()> {
         if let Some(ref mut stream) = self.stream {
-            let mut framed = FramedWrite::new(stream, LengthDelimitedCodec::new());
+            let _framed = FramedWrite::new(stream, LengthDelimitedCodec::new());
             // TODO: Implement actual sending
             Ok(())
         } else {
-            Err(CompositorError::IPC("Not connected".into()).into())
+            Err(CompositorError::ipc("Not connected").into())
         }
     }
 }

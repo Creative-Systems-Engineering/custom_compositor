@@ -3,6 +3,7 @@ use compositor_utils::prelude::*;
 use std::ffi::{CStr, CString};
 
 /// Vulkan instance wrapper with validation layers for development
+#[derive(Clone)]
 pub struct VulkanInstance {
     entry: Entry,
     instance: Instance,
@@ -13,6 +14,16 @@ pub struct VulkanInstance {
 struct DebugUtils {
     loader: ash::extensions::ext::DebugUtils,
     messenger: vk::DebugUtilsMessengerEXT,
+}
+
+// Manual Clone implementation since DebugUtils doesn't derive Clone
+impl Clone for DebugUtils {
+    fn clone(&self) -> Self {
+        Self {
+            loader: self.loader.clone(),
+            messenger: self.messenger,
+        }
+    }
 }
 
 impl VulkanInstance {

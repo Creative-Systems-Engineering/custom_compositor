@@ -16,6 +16,7 @@ smithay = { workspace = true }
 wayland-server = { workspace = true }
 wayland-protocols = { workspace = true }
 calloop = { workspace = true }
+drm-fourcc = { workspace = true }
 
 # Async
 tokio = { workspace = true }
@@ -31,6 +32,7 @@ tracing = { workspace = true }
 
 # Math and graphics
 glam = { workspace = true }
+ash = { workspace = true }
 
 # System programming
 nix = { workspace = true }
