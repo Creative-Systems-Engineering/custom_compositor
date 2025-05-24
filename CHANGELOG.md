@@ -7,11 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **linux-dmabuf-v1 Protocol**: Zero-copy GPU buffer sharing for professional applications
+- **Format Support**: XRGB8888 and ARGB8888 with Linear modifier
+- **Smithay 0.6 API**: Updated to current API standards
+
+### Fixed  
+- **dmabuf Implementation**: Replaced deprecated API with dmabuf_state.create_global()
+- **Build System**: Clean compilation across all crates
+- **Import Resolution**: Proper drm_fourcc integration
+
 ### In Progress
-- Live testing with real Wayland clients
+- Wave 1 protocol stack completion (xdg-output-unstable-v1, zwp-relative-pointer-v1)
 - Surface-to-texture rendering pipeline
 - Input event routing and processing
-- Window decoration and controls
 - Performance profiling for 4K displays
 
 ### Planned

@@ -76,7 +76,7 @@ impl Container {
     
     /// Calculate child position based on index and layout
     pub fn child_position(&self, child_index: usize, child_size: Vec2) -> Vec2 {
-        let (client_pos, client_size) = self.client_area();
+        let (client_pos, _client_size) = self.client_area();
         
         match self.layout_direction {
             LayoutDirection::Horizontal => {

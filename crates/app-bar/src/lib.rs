@@ -12,8 +12,8 @@ pub mod config;
 
 /// Main app bar component
 pub struct AppBar {
-    position: AppBarPosition,
-    size: AppBarSize,
+    _position: AppBarPosition,
+    _size: AppBarSize,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -36,8 +36,8 @@ impl AppBar {
         info!("Initializing App Bar");
         
         Ok(Self {
-            position: AppBarPosition::Left,
-            size: AppBarSize { width: 80.0, height: 1080.0 },
+            _position: AppBarPosition::Left,
+            _size: AppBarSize { width: 80.0, height: 1080.0 },
         })
     }
 }
