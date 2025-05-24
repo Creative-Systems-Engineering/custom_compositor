@@ -366,6 +366,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "calloop 0.14.2",
  "compositor-utils",
  "crossbeam-channel",
  "futures",

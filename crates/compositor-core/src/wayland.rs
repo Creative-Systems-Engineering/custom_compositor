@@ -5,10 +5,11 @@ use smithay::{
     input::{Seat, SeatHandler, SeatState},
     output::{Output, PhysicalProperties, Subpixel},
     reexports::{
+        calloop::{EventLoop, LoopSignal},
         wayland_server::{
             backend::{ClientData, ClientId, DisconnectReason},
             protocol::{wl_seat::WlSeat, wl_surface::WlSurface},
-            Display, DisplayHandle, Resource,
+            Display, Resource,
         },
     },
     utils::{Clock, Monotonic, Serial},
@@ -22,6 +23,8 @@ use smithay::{
         socket::ListeningSocketSource,
     },
 };
+
+use std::sync::Arc;
 
 /// Client state data
 #[derive(Default)]
@@ -45,18 +48,27 @@ pub struct WaylandServerState {
     pub socket_name: Option<String>,
 }
 
-/// Wayland server implementation using smithay
+/// Wayland server implementation using smithay and calloop
 pub struct WaylandServer {
-    display: Display<WaylandServerState>,
-    state: WaylandServerState,
-    socket_source: Option<ListeningSocketSource>,
+    pub event_loop: EventLoop<'static, WaylandServerState>,
+    pub state: WaylandServerState,
+    pub display: Display<WaylandServerState>,
+    pub loop_signal: LoopSignal,
 }
 
 impl WaylandServer {
-    /// Create a new Wayland server
+    /// Create a new Wayland server with event loop
     pub fn new() -> Result<Self> {
-        info!("Initializing Wayland server with smithay");
+        info!("Initializing Wayland server with smithay and calloop");
         
+        // Create event loop first
+        let event_loop = EventLoop::try_new()
+            .map_err(|e| CompositorError::wayland(format!("Failed to create event loop: {}", e)))?;
+        
+        let _loop_handle = event_loop.handle();
+        let loop_signal = event_loop.get_signal();
+        
+        // Create display with the loop handle
         let display = Display::new()
             .map_err(|e| CompositorError::wayland(format!("Failed to create display: {}", e)))?;
         
@@ -68,7 +80,7 @@ impl WaylandServer {
         let shm_state = ShmState::new::<WaylandServerState>(&dh, vec![]);
         let seat_state = SeatState::new();
         
-        // Create default output (we'll make this more sophisticated later)
+        // Create default output (4K setup)
         let output = Output::new(
             "custom-compositor-output".to_string(),
             PhysicalProperties {
@@ -89,11 +101,9 @@ impl WaylandServer {
             refresh: 60_000,
         });
         
-        // Create space 
+        // Create space and map output
         let mut space = Space::default();
         space.map_output(&output, (0, 0));
-        
-        // Seat will be created when needed
         
         let clock = Clock::new();
         
@@ -107,69 +117,129 @@ impl WaylandServer {
             socket_name: None,
         };
         
-        info!("Wayland server state initialized");
+        info!("Wayland server state initialized with calloop");
         
         Ok(Self {
-            display,
+            event_loop,
             state,
-            socket_source: None,
+            display,
+            loop_signal,
         })
     }
     
-    /// Start listening on a Wayland socket
+    /// Start listening on a Wayland socket and integrate with event loop
     pub fn start_listening(&mut self) -> Result<()> {
+        info!("Starting Wayland socket and integrating with event loop");
+        
+        // Create listening socket
         let socket_source = ListeningSocketSource::new_auto()
             .map_err(|e| CompositorError::wayland(format!("Failed to create socket: {}", e)))?;
         
         let socket_name = socket_source.socket_name().to_string_lossy().into_owned();
         self.state.socket_name = Some(socket_name.clone());
         
-        // Store socket source for later integration with calloop event loop
-        self.socket_source = Some(socket_source);
+        // Insert socket into event loop
+        let mut display_handle = self.display.handle();
+        self.event_loop
+            .handle()
+            .insert_source(socket_source, move |client_stream, _, _state| {
+                // Handle new client connections
+                if let Err(err) = display_handle.insert_client(client_stream, Arc::new(ClientState::default())) {
+                    error!("Failed to insert client: {}", err);
+                }
+            })
+            .map_err(|e| CompositorError::wayland(format!("Failed to insert socket source: {}", e)))?;
         
         info!("Wayland server listening on socket: {}", socket_name);
         info!("Set WAYLAND_DISPLAY={} to connect clients", socket_name);
+        
+        // Set environment variable for clients
+        std::env::set_var("WAYLAND_DISPLAY", &socket_name);
+        
         Ok(())
     }
     
-    /// Get the socket source for event loop integration
-    pub fn take_socket_source(&mut self) -> Option<ListeningSocketSource> {
-        self.socket_source.take()
+    /// Run the event loop (blocking)
+    pub fn run(mut self) -> Result<()> {
+        info!("Starting Wayland server event loop");
+        
+        // Main event loop using smithay's standard pattern
+        loop {
+            // Dispatch wayland events
+            if let Err(e) = self.display.dispatch_clients(&mut self.state) {
+                error!("Error dispatching clients: {}", e);
+                break;
+            }
+            
+            // Flush pending events  
+            if let Err(e) = self.display.flush_clients() {
+                error!("Error flushing clients: {}", e);
+                break;
+            }
+            
+            // Run event loop iteration
+            if let Err(e) = self.event_loop.dispatch(Some(std::time::Duration::from_millis(16)), &mut self.state) {
+                error!("Event loop error: {}", e);
+                break;
+            }
+        }
+        
+        info!("Wayland server event loop terminated");
+        Ok(())
     }
     
-    /// Process pending Wayland events
-    pub async fn process_events(&mut self) -> Result<()> {
-        // Dispatch pending events
-        self.display.dispatch_clients(&mut self.state)
-            .map_err(|e| CompositorError::wayland(format!("Failed to dispatch clients: {}", e)))?;
+    /// Run the event loop asynchronously (non-blocking)
+    pub async fn run_async(mut self) -> Result<()> {
+        info!("Starting Wayland server async event loop");
         
-        // Flush pending events
-        self.display.flush_clients()
-            .map_err(|e| CompositorError::wayland(format!("Failed to flush clients: {}", e)))?;
+        // Async event loop using smithay's standard pattern
+        loop {
+            // Dispatch wayland events
+            if let Err(e) = self.display.dispatch_clients(&mut self.state) {
+                error!("Error dispatching clients: {}", e);
+                break;
+            }
+            
+            // Flush pending events  
+            if let Err(e) = self.display.flush_clients() {
+                error!("Error flushing clients: {}", e);
+                break;
+            }
+            
+            // Run event loop iteration with async yield
+            if let Err(e) = self.event_loop.dispatch(Some(std::time::Duration::from_millis(16)), &mut self.state) {
+                error!("Event loop error: {}", e);
+                break;
+            }
+            
+            // Yield to other async tasks
+            tokio::task::yield_now().await;
+        }
         
-        tokio::task::yield_now().await;
+        info!("Wayland server async event loop terminated");
         Ok(())
+    }
+    
+    /// Get the loop signal for shutdown
+    pub fn loop_signal(&self) -> LoopSignal {
+        self.loop_signal.clone()
+    }
+    
+    /// Get socket name if listening
+    pub fn socket_name(&self) -> Option<&str> {
+        self.state.socket_name.as_deref()
     }
     
     /// Shutdown the Wayland server
     pub async fn shutdown(&mut self) -> Result<()> {
         info!("Shutting down Wayland server");
         
-        if let Some(socket_name) = &self.state.socket_name {
-            info!("Closed socket: {}", socket_name);
-        }
+        // Signal the event loop to stop
+        self.loop_signal.stop();
         
+        // The event loop should stop processing after receiving the signal
+        info!("Wayland server shutdown complete");
         Ok(())
-    }
-    
-    /// Get the display handle
-    pub fn display_handle(&self) -> DisplayHandle {
-        self.display.handle()
-    }
-    
-    /// Get socket name if listening
-    pub fn socket_name(&self) -> Option<&str> {
-        self.state.socket_name.as_deref()
     }
 }
 

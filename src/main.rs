@@ -16,7 +16,7 @@ async fn main() -> anyhow::Result<()> {
     print_system_info();
     
     // Create and run compositor
-    let mut compositor = Compositor::new().await
+    let compositor = Compositor::new().await
         .context("Failed to create compositor")?;
     
     // Display connection information
@@ -27,15 +27,9 @@ async fn main() -> anyhow::Result<()> {
     
     info!("Compositor created successfully, starting main loop");
     
-    // Run the compositor
+    // Run the compositor (this consumes self and handles its own cleanup)
     if let Err(e) = compositor.run().await {
         error!("Compositor error: {}", e);
-        
-        // Attempt graceful shutdown
-        if let Err(shutdown_err) = compositor.shutdown().await {
-            error!("Error during shutdown: {}", shutdown_err);
-        }
-        
         return Err(e.into());
     }
     

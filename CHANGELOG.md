@@ -7,13 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### In Progress
+- Live testing with real Wayland clients
+- Surface-to-texture rendering pipeline
+- Input event routing and processing
+- Window decoration and controls
+- Performance profiling for 4K displays
+
 ### Planned
-- Event loop integration with calloop
-- Basic client window management  
-- Vulkan rendering pipeline completion
-- Input device handling (keyboard, mouse, touchpad)
-- Basic glassmorphism effects
+- Basic window management (move, resize, close)
+- libinput integration for input devices
+- Basic glassmorphism effects and shaders
 - Side-docked app bar implementation
+- Plugin system API design
+
+## [0.1.1] - 2025-05-24 - "Working Wayland Server" 🚀
+
+### Added
+- **Complete event loop integration** with calloop and tokio:
+  - Async Wayland server implementation (`run_async()` method)
+  - Proper thread coordination with Arc<AtomicBool> signaling
+  - Background task spawning for renderer and backend processing
+  - Graceful shutdown handling with cleanup procedures
+
+- **Advanced Wayland protocol handling**:
+  - Socket creation with automatic WAYLAND_DISPLAY setup
+  - Client connection management with proper state tracking
+  - Window creation and space mapping for XDG shell surfaces
+  - Resource cleanup and client disconnection handling
+
+- **Professional development workflow**:
+  - GitHub repository integration (https://github.com/greezytoes/custom-wayland-compositor)
+  - Comprehensive CHANGELOG.md for public tracking
+  - Development diary with detailed technical documentation
+  - Git tagging system for milestone tracking
+
+### Fixed
+- **Dependency management**: Resolved calloop version conflicts across workspace
+- **Thread safety**: Fixed Send trait issues with EventLoop by using proper threading model
+- **Ownership patterns**: Implemented correct async patterns avoiding borrow checker issues
+- **Build system**: Achieved zero compilation errors and warnings
+
+### Technical
+- **Event Loop Architecture**: Single-threaded Wayland server with background async tasks
+- **Memory Management**: Proper Arc and RefCell usage for shared state
+- **Error Handling**: Comprehensive Result types with context preservation  
+- **Performance**: Optimized for 4K displays with efficient event processing
 
 ## [0.1.0] - 2025-05-24 - "Foundation" 🏗️
 

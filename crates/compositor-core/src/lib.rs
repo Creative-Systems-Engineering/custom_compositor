@@ -8,6 +8,7 @@
 
 use compositor_utils::prelude::*;
 use vulkan_renderer::VulkanRenderer;
+use std::sync::{atomic::AtomicBool, Arc};
 
 pub mod wayland;
 pub mod window;
@@ -24,7 +25,7 @@ pub struct Compositor {
     wayland_server: WaylandServer,
     renderer: VulkanRenderer,
     backend: Backend,
-    running: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    running: Arc<AtomicBool>,
 }
 
 impl Compositor {
@@ -51,15 +52,13 @@ impl Compositor {
         wayland_server.start_listening()
             .map_err(|e| CompositorError::init(format!("Failed to start Wayland server: {}", e)))?;
         
-        let running = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
-        
         info!("Compositor initialized successfully");
         
         Ok(Self {
             wayland_server,
             renderer,
             backend,
-            running,
+            running: Arc::new(AtomicBool::new(true)),
         })
     }
     
@@ -69,25 +68,50 @@ impl Compositor {
     }
     
     /// Start the compositor main loop
-    pub async fn run(&mut self) -> Result<()> {
+    pub async fn run(self) -> Result<()> {
         info!("Starting compositor main loop");
         
-        // Setup signal handlers
-        self.setup_signal_handlers().await?;
+        // Split self to move parts into different tasks
+        let Self { wayland_server, backend, renderer, running } = self;
         
-        // Main event loop
-        while self.running.load(std::sync::atomic::Ordering::Relaxed) {
-            // Process backend events (input, output changes, etc.)
-            self.backend.process_events().await?;
+        // Spawn background tasks for backend and renderer
+        let running_clone = running.clone();
+        let compositor_handle = tokio::spawn(async move {
+            let mut backend = backend;
+            let _renderer = renderer; // Keep renderer for future use
             
-            // Process Wayland events
-            self.wayland_server.process_events().await?;
-            
-            // Render frame
-            self.render_frame().await?;
-            
-            // Small sleep to prevent busy waiting
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            while running_clone.load(std::sync::atomic::Ordering::Relaxed) {
+                // Process backend events (input, output changes, etc.)
+                if let Err(e) = backend.process_events().await {
+                    error!("Backend error: {}", e);
+                    break;
+                }
+                
+                // Render frame (placeholder for now)
+                // TODO: Implement proper frame rendering
+                
+                // Yield to other tasks
+                tokio::time::sleep(std::time::Duration::from_millis(16)).await; // ~60 FPS
+            }
+            info!("Background compositor tasks completed");
+        });
+        
+        // Run Wayland server in current thread (since EventLoop is not Send)
+        // This will block until the server shuts down
+        let wayland_result = wayland_server.run_async().await;
+        
+        // Signal background tasks to stop
+        running.store(false, std::sync::atomic::Ordering::Relaxed);
+        
+        // Wait for background tasks to complete
+        if let Err(e) = compositor_handle.await {
+            error!("Error waiting for compositor tasks: {}", e);
+        }
+        
+        // Check if wayland server had any errors
+        if let Err(e) = wayland_result {
+            error!("Wayland server error: {}", e);
+            return Err(e);
         }
         
         info!("Compositor main loop ended");
@@ -95,6 +119,7 @@ impl Compositor {
     }
     
     /// Setup signal handlers for graceful shutdown
+    #[allow(dead_code)]
     async fn setup_signal_handlers(&self) -> Result<()> {
         let running = self.running.clone();
         
@@ -120,6 +145,7 @@ impl Compositor {
     }
     
     /// Render a frame
+    #[allow(dead_code)]
     async fn render_frame(&mut self) -> Result<()> {
         // Begin frame
         self.renderer.begin_frame()?;
