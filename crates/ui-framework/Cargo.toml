@@ -1,0 +1,33 @@
+[package]
+name = "ui-framework"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Custom UI framework with glassmorphism and neomorphism support"
+
+[dependencies]
+# Local dependencies
+compositor-utils = { path = "../utils" }
+vulkan-renderer = { path = "../vulkan-renderer" }
+
+# Math and graphics
+glam = { workspace = true }
+
+# Async
+tokio = { workspace = true }
+futures = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Serialization for styling and themes
+serde = { workspace = true }
+
+# Utilities
+once_cell = { workspace = true }
+parking_lot = { workspace = true }

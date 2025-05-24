@@ -1,0 +1,43 @@
+[package]
+name = "compositor-utils"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Shared utilities and common functionality for the custom compositor"
+
+[dependencies]
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-appender = { workspace = true }
+
+# Async utilities
+tokio = { workspace = true }
+futures = { workspace = true }
+
+# Utilities
+once_cell = { workspace = true }
+parking_lot = { workspace = true }
+crossbeam-channel = { workspace = true }
+uuid = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+
+# Math
+glam = { workspace = true }
+
+# Graphics (for error types)
+ash = { workspace = true }
+
+# Configuration (for error types)
+ron = { workspace = true }
+
+# System programming
+nix = { workspace = true }
+libc = { workspace = true }

@@ -1,0 +1,35 @@
+[package]
+name = "config"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Configuration management for the custom Wayland compositor"
+
+[dependencies]
+# Error handling and utilities
+thiserror.workspace = true
+anyhow.workspace = true
+
+# Serialization and configuration
+serde = { workspace = true, features = ["derive"] }
+toml.workspace = true
+ron.workspace = true
+
+# File system operations
+notify.workspace = true
+dirs.workspace = true
+
+# Async support
+tokio = { workspace = true, features = ["fs", "sync"] }
+
+# Logging
+tracing.workspace = true
+
+# Internal dependencies
+compositor-utils = { path = "../utils" }
+
+[dev-dependencies]
+tokio-test.workspace = true
+tempfile.workspace = true

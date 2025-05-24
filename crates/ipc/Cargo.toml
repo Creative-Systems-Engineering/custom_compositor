@@ -1,0 +1,34 @@
+[package]
+name = "ipc"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Inter-process communication for the custom Wayland compositor"
+
+[dependencies]
+# Error handling and utilities
+thiserror.workspace = true
+anyhow.workspace = true
+
+# Serialization
+serde = { workspace = true, features = ["derive"] }
+bincode.workspace = true
+
+# Async support
+tokio = { workspace = true, features = ["net", "sync", "io-util", "macros"] }
+
+# Message framing  
+tokio-util = { workspace = true }
+bytes = { workspace = true }
+
+# Logging
+tracing.workspace = true
+
+# Internal dependencies
+compositor-utils = { path = "../utils" }
+
+[dev-dependencies]
+tokio-test.workspace = true
+tempfile.workspace = true

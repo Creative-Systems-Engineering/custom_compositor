@@ -1,0 +1,36 @@
+[package]
+name = "plugin-system"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Dynamic plugin loading and management system"
+
+[dependencies]
+# Local dependencies
+compositor-utils = { path = "../utils" }
+
+# Dynamic loading
+libloading = { workspace = true }
+
+# Async
+tokio = { workspace = true }
+futures = { workspace = true }
+async-trait = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Serialization for plugin manifests
+serde = { workspace = true }
+ron = { workspace = true }
+toml = { workspace = true }
+
+# Utilities
+once_cell = { workspace = true }
+parking_lot = { workspace = true }
+uuid = { workspace = true }

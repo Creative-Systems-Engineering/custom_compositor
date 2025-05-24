@@ -1,0 +1,34 @@
+[package]
+name = "vulkan-renderer"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Vulkan-based renderer for the custom compositor"
+
+[dependencies]
+# Local dependencies
+compositor-utils = { path = "../utils" }
+
+# Vulkan and graphics
+ash = { workspace = true }
+gpu-allocator = { workspace = true }
+bytemuck = { workspace = true }
+
+# Math
+glam = { workspace = true }
+
+# Async
+tokio = { workspace = true }
+futures = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Utilities
+once_cell = { workspace = true }
+parking_lot = { workspace = true }

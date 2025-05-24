@@ -1,0 +1,43 @@
+# Rust target directory
+/target/
+**/*.rs.bk
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+/tmp/
+
+# Backup files
+*.bak
+*.orig
+
+# System libraries (we'll track these as dependencies)
+*.so
+*.dylib
+*.dll
+
+# Temporary files
+/tmp/
+*.tmp
+*.swp
+*.swo
+
+# Environment files
+.env
+.env.local
+
+# Debug builds (only release artifacts if needed)
+**/debug/
+
+# Dependency cache
+**/deps/
+
+# Documentation build
+/target/doc/

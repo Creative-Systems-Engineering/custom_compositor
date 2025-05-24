@@ -1,0 +1,34 @@
+[package]
+name = "app-bar"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Side-docked app bar component - flagship feature of the compositor"
+
+[dependencies]
+# Local dependencies
+compositor-utils = { path = "../utils" }
+ui-framework = { path = "../ui-framework" }
+vulkan-renderer = { path = "../vulkan-renderer" }
+
+# Math and graphics
+glam = { workspace = true }
+
+# Async
+tokio = { workspace = true }
+futures = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+
+# Utilities
+once_cell = { workspace = true }
+parking_lot = { workspace = true }
