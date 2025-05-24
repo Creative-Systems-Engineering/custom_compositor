@@ -21,6 +21,7 @@ use smithay::{
         buffer::BufferHandler,
         compositor::{CompositorClientState, CompositorHandler, CompositorState, with_states},
         dmabuf::{DmabufHandler, DmabufState, DmabufGlobal, ImportNotifier},
+        relative_pointer::RelativePointerManagerState,
         shell::xdg::{
             PopupSurface, PositionerState, ToplevelSurface, XdgShellHandler, XdgShellState,
         },
@@ -50,6 +51,7 @@ pub struct WaylandServerState {
     pub dmabuf_state: DmabufState,
     pub dmabuf_global: DmabufGlobal,
     pub output_manager_state: OutputManagerState,
+    pub relative_pointer_manager_state: RelativePointerManagerState,
     pub seat_state: SeatState<Self>,
     pub space: Space<Window>,
     pub clock: Clock<Monotonic>,
@@ -111,6 +113,9 @@ impl WaylandServer {
         // Initialize output manager with xdg-output support for multi-monitor configuration
         let output_manager_state = OutputManagerState::new_with_xdg_output::<WaylandServerState>(&dh);
         
+        // Initialize relative pointer manager for 3D viewport navigation and gaming
+        let relative_pointer_manager_state = RelativePointerManagerState::new::<WaylandServerState>(&dh);
+        
         // Create default output (4K setup)
         let output = Output::new(
             "custom-compositor-output".to_string(),
@@ -145,6 +150,7 @@ impl WaylandServer {
             dmabuf_state,
             dmabuf_global,
             output_manager_state,
+            relative_pointer_manager_state,
             seat_state,
             space,
             clock,
@@ -430,3 +436,4 @@ smithay::delegate_output!(WaylandServerState);
 smithay::delegate_shm!(WaylandServerState);
 smithay::delegate_dmabuf!(WaylandServerState);
 smithay::delegate_seat!(WaylandServerState);
+smithay::delegate_relative_pointer!(WaylandServerState);

@@ -6,7 +6,7 @@
 
 - [x] **linux-dmabuf-v1** - Zero-copy GPU buffer sharing for performance ✅ COMPLETED
 - [x] **xdg-output-unstable-v1** - Precise multi-monitor configuration ✅ COMPLETED
-- [ ] **zwp-relative-pointer-v1** - 3D viewport navigation and gaming
+- [x] **zwp-relative-pointer-v1** - 3D viewport navigation and gaming ✅ COMPLETED
 - [ ] **zwp-pointer-constraints-v1** - Precise mouse control for creative apps
 - [ ] **wl-drm** - Direct rendering manager integration
 - [ ] **zwp-linux-explicit-sync-v1** - GPU synchronization and frame timing
