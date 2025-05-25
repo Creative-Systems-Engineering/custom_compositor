@@ -49,6 +49,10 @@ impl Compositor {
         let mut wayland_server = WaylandServer::new()
             .map_err(|e| CompositorError::init(format!("Failed to initialize Wayland server: {}", e)))?;
         
+        // Initialize wl_drm protocol support via EGL backend
+        wayland_server.initialize_wl_drm()
+            .map_err(|e| CompositorError::init(format!("Failed to initialize wl_drm protocol: {}", e)))?;
+        
         // Start listening for client connections
         wayland_server.start_listening()
             .map_err(|e| CompositorError::init(format!("Failed to start Wayland server: {}", e)))?;

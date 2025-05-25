@@ -53,7 +53,7 @@ futures = "0.3"
 async-trait = "0.1"
 
 # Wayland and window management
-smithay = { version = "0.6", features = ["backend_drm", "backend_libinput", "backend_vulkan", "backend_gbm"] }
+smithay = { version = "0.6", features = ["backend_drm", "backend_egl", "backend_libinput", "backend_vulkan", "backend_gbm"] }
 wayland-server = "0.31"
 wayland-protocols = "0.32"
 calloop = "0.14"

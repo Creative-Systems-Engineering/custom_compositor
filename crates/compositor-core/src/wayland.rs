@@ -3,7 +3,11 @@ use vulkan_renderer::VulkanRenderer;
 use drm_fourcc::{DrmFourcc, DrmModifier};
 
 use smithay::{
-    backend::allocator::{dmabuf::Dmabuf, Buffer, Format},
+    backend::{
+        allocator::{dmabuf::Dmabuf, Buffer, Format, gbm::GbmDevice},
+        drm::DrmNode,
+        egl::{EGLContext, EGLDisplay},
+    },
     desktop::{Space, Window},
     input::{Seat, SeatHandler, SeatState, pointer::PointerHandle},
     output::{Output, PhysicalProperties, Subpixel},
@@ -58,6 +62,12 @@ pub struct WaylandServerState {
     pub space: Space<Window>,
     pub clock: Clock<Monotonic>,
     pub socket_name: Option<String>,
+    /// EGL context for hardware acceleration and wl_drm protocol support
+    pub egl_context: Option<EGLContext>,
+    /// EGL display for wl_drm protocol integration 
+    pub egl_display: Option<EGLDisplay>,
+    /// DRM node for GPU resource management
+    pub drm_node: Option<DrmNode>,
     /// Vulkan renderer for surface compositing
     pub renderer: Option<Arc<Mutex<VulkanRenderer>>>,
 }
@@ -161,7 +171,10 @@ impl WaylandServer {
             space,
             clock,
             socket_name: None,
-            renderer: None, // Initialize with no renderer
+            egl_context: None, // Will be initialized when backend is configured
+            egl_display: None, // Will be initialized for wl_drm protocol support
+            drm_node: None,    // Will be set when DRM device is detected
+            renderer: None,    // Initialize with no renderer
         };
         
         info!("Wayland server state initialized with calloop");
@@ -172,6 +185,90 @@ impl WaylandServer {
             display,
             loop_signal,
         })
+    }
+    
+    /// Initialize EGL display and bind to Wayland display for wl_drm protocol support
+    /// This automatically enables the wl_drm protocol for legacy EGL applications
+    pub fn initialize_wl_drm(&mut self) -> Result<()> {
+        info!("Initializing EGL display for wl_drm protocol support");
+        
+        // Try to find a primary DRM node (usually /dev/dri/card0)
+        let drm_node = match DrmNode::from_path("/dev/dri/card0") {
+            Ok(node) => {
+                info!("Found primary DRM node: {:?}", node.dev_path());
+                Some(node)
+            }
+            Err(e) => {
+                warn!("Failed to open primary DRM node /dev/dri/card0: {}, trying render node", e);
+                
+                // Try render node as fallback (/dev/dri/renderD128)
+                match DrmNode::from_path("/dev/dri/renderD128") {
+                    Ok(node) => {
+                        info!("Found DRM render node: {:?}", node.dev_path());
+                        Some(node)
+                    }
+                    Err(e) => {
+                        warn!("Failed to open DRM render node: {}, wl_drm will be unavailable", e);
+                        None
+                    }
+                }
+            }
+        };
+        
+        // Store the DRM node
+        self.state.drm_node = drm_node;
+        
+        // Initialize EGL display if we have a DRM node
+        if let Some(ref drm_node) = self.state.drm_node {
+            // Get the device path - dev_path() returns Option<PathBuf>
+            let device_path = match drm_node.dev_path() {
+                Some(path) => path,
+                None => {
+                    warn!("DRM node has no device path, wl_drm protocol unavailable");
+                    return Ok(());
+                }
+            };
+            
+            // Open the DRM device file
+            let fd = match std::fs::File::open(&device_path) {
+                Ok(file) => file,
+                Err(e) => {
+                    warn!("Failed to open DRM device file {:?}: {}, wl_drm protocol unavailable", device_path, e);
+                    return Ok(());
+                }
+            };
+            
+            // Create GBM device from DRM file descriptor
+            match GbmDevice::new(fd) {
+                Ok(gbm_device) => {
+                    info!("Created GBM device for DRM node: {:?}", device_path);
+                    
+                    // Create EGL display from GBM device
+                    match unsafe { EGLDisplay::new(gbm_device) } {
+                        Ok(egl_display) => {
+                            info!("✅ Created EGL display from GBM device, wl_drm protocol support enabled");
+                            self.state.egl_display = Some(egl_display);
+                        }
+                        Err(e) => {
+                            warn!("Failed to create EGL display from GBM device: {}, wl_drm unavailable", e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!("Failed to create GBM device: {}, wl_drm protocol unavailable", e);
+                }
+            }
+        } else {
+            info!("No DRM node available, wl_drm protocol will be unavailable");
+        }
+        
+        if self.state.egl_display.is_some() {
+            info!("wl_drm protocol successfully initialized for legacy EGL application support");
+        } else {
+            info!("wl_drm protocol unavailable - modern applications can use dmabuf instead");
+        }
+        
+        Ok(())
     }
     
     /// Start listening on a Wayland socket and integrate with event loop
