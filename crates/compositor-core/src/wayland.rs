@@ -1,13 +1,15 @@
 use compositor_utils::prelude::*;
 use vulkan_renderer::VulkanRenderer;
 use drm_fourcc::{DrmFourcc, DrmModifier};
+use std::os::fd::OwnedFd;
 
 use smithay::{
     backend::{
         allocator::{dmabuf::Dmabuf, Buffer, Format, gbm::GbmDevice},
-        drm::DrmNode,
+        drm::{DrmNode, DrmDeviceFd},
         egl::{EGLContext, EGLDisplay},
     },
+    utils::DeviceFd,
     desktop::{Space, Window},
     input::{Seat, SeatHandler, SeatState, pointer::PointerHandle},
     output::{Output, PhysicalProperties, Subpixel},
@@ -25,6 +27,7 @@ use smithay::{
         buffer::BufferHandler,
         compositor::{CompositorClientState, CompositorHandler, CompositorState, with_states},
         dmabuf::{DmabufHandler, DmabufState, DmabufGlobal, ImportNotifier},
+        drm_syncobj::{DrmSyncobjHandler, DrmSyncobjState, supports_syncobj_eventfd},
         pointer_constraints::{PointerConstraintsHandler, PointerConstraintsState},
         relative_pointer::RelativePointerManagerState,
         shell::xdg::{
@@ -58,6 +61,7 @@ pub struct WaylandServerState {
     pub output_manager_state: OutputManagerState,
     pub relative_pointer_manager_state: RelativePointerManagerState,
     pub pointer_constraints_state: PointerConstraintsState,
+    pub drm_syncobj_state: Option<DrmSyncobjState>,
     pub seat_state: SeatState<Self>,
     pub space: Space<Window>,
     pub clock: Clock<Monotonic>,
@@ -68,6 +72,8 @@ pub struct WaylandServerState {
     pub egl_display: Option<EGLDisplay>,
     /// DRM node for GPU resource management
     pub drm_node: Option<DrmNode>,
+    /// DRM device file descriptor for explicit sync support
+    pub drm_device_fd: Option<DrmDeviceFd>,
     /// Vulkan renderer for surface compositing
     pub renderer: Option<Arc<Mutex<VulkanRenderer>>>,
 }
@@ -167,6 +173,7 @@ impl WaylandServer {
             output_manager_state,
             relative_pointer_manager_state,
             pointer_constraints_state,
+            drm_syncobj_state: None, // Will be initialized when DRM device is configured
             seat_state,
             space,
             clock,
@@ -174,6 +181,7 @@ impl WaylandServer {
             egl_context: None, // Will be initialized when backend is configured
             egl_display: None, // Will be initialized for wl_drm protocol support
             drm_node: None,    // Will be set when DRM device is detected
+            drm_device_fd: None, // Will be set for explicit sync support
             renderer: None,    // Initialize with no renderer
         };
         
@@ -187,10 +195,11 @@ impl WaylandServer {
         })
     }
     
-    /// Initialize EGL display and bind to Wayland display for wl_drm protocol support
+    /// Initialize EGL display and explicit sync support
     /// This automatically enables the wl_drm protocol for legacy EGL applications
+    /// and zwp-linux-explicit-sync-v1 for modern GPU synchronization
     pub fn initialize_wl_drm(&mut self) -> Result<()> {
-        info!("Initializing EGL display for wl_drm protocol support");
+        info!("Initializing EGL display for wl_drm and explicit sync protocol support");
         
         // Try to find a primary DRM node (usually /dev/dri/card0)
         let drm_node = match DrmNode::from_path("/dev/dri/card0") {
@@ -208,7 +217,7 @@ impl WaylandServer {
                         Some(node)
                     }
                     Err(e) => {
-                        warn!("Failed to open DRM render node: {}, wl_drm will be unavailable", e);
+                        warn!("Failed to open DRM render node: {}, wl_drm and explicit sync will be unavailable", e);
                         None
                     }
                 }
@@ -218,13 +227,13 @@ impl WaylandServer {
         // Store the DRM node
         self.state.drm_node = drm_node;
         
-        // Initialize EGL display if we have a DRM node
+        // Initialize EGL display and explicit sync if we have a DRM node
         if let Some(ref drm_node) = self.state.drm_node {
             // Get the device path - dev_path() returns Option<PathBuf>
             let device_path = match drm_node.dev_path() {
                 Some(path) => path,
                 None => {
-                    warn!("DRM node has no device path, wl_drm protocol unavailable");
+                    warn!("DRM node has no device path, protocols unavailable");
                     return Ok(());
                 }
             };
@@ -233,13 +242,46 @@ impl WaylandServer {
             let fd = match std::fs::File::open(&device_path) {
                 Ok(file) => file,
                 Err(e) => {
-                    warn!("Failed to open DRM device file {:?}: {}, wl_drm protocol unavailable", device_path, e);
+                    warn!("Failed to open DRM device file {:?}: {}, protocols unavailable", device_path, e);
                     return Ok(());
                 }
             };
             
-            // Create GBM device from DRM file descriptor
-            match GbmDevice::new(fd) {
+            // Create DRM device file descriptor for explicit sync
+            let owned_fd: OwnedFd = fd.into();
+            let device_fd = DeviceFd::from(owned_fd);
+            let drm_device_fd = Some(DrmDeviceFd::new(device_fd));
+            info!("Created DRM device fd for explicit sync support");
+            
+            // Initialize explicit sync if device supports it
+            if let Some(ref device_fd) = drm_device_fd {
+                if supports_syncobj_eventfd(device_fd) {
+                    info!("✅ DRM device supports explicit sync, initializing zwp-linux-explicit-sync-v1");
+                    
+                    let dh = self.display.handle();
+                    let syncobj_state = DrmSyncobjState::new::<WaylandServerState>(&dh, device_fd.clone());
+                    self.state.drm_syncobj_state = Some(syncobj_state);
+                    
+                    info!("✅ zwp-linux-explicit-sync-v1 protocol initialized for frame-perfect timing control");
+                } else {
+                    warn!("DRM device does not support syncobj eventfd, explicit sync unavailable");
+                }
+                
+                // Store the device fd regardless of sync support for potential future use
+                self.state.drm_device_fd = drm_device_fd;
+            }
+            
+            // Create GBM device from DRM file descriptor for EGL display
+            // Re-open the file since DrmDeviceFd consumed the original
+            let fd_for_gbm = match std::fs::File::open(&device_path) {
+                Ok(file) => file,
+                Err(e) => {
+                    warn!("Failed to re-open DRM device file for GBM: {}, wl_drm protocol unavailable", e);
+                    return Ok(());
+                }
+            };
+            
+            match GbmDevice::new(fd_for_gbm) {
                 Ok(gbm_device) => {
                     info!("Created GBM device for DRM node: {:?}", device_path);
                     
@@ -259,14 +301,25 @@ impl WaylandServer {
                 }
             }
         } else {
-            info!("No DRM node available, wl_drm protocol will be unavailable");
+            info!("No DRM node available, wl_drm and explicit sync protocols will be unavailable");
         }
         
-        if self.state.egl_display.is_some() {
-            info!("wl_drm protocol successfully initialized for legacy EGL application support");
-        } else {
-            info!("wl_drm protocol unavailable - modern applications can use dmabuf instead");
-        }
+        // Report initialization status
+        let wl_drm_status = if self.state.egl_display.is_some() { 
+            "initialized" 
+        } else { 
+            "unavailable" 
+        };
+        
+        let explicit_sync_status = if self.state.drm_syncobj_state.is_some() { 
+            "initialized" 
+        } else { 
+            "unavailable" 
+        };
+        
+        info!("Protocol initialization complete:");
+        info!("  • wl_drm (legacy EGL): {}", wl_drm_status);
+        info!("  • zwp-linux-explicit-sync-v1 (modern GPU sync): {}", explicit_sync_status);
         
         Ok(())
     }
@@ -553,6 +606,13 @@ impl PointerConstraintsHandler for WaylandServerState {
     }
 }
 
+// DRM syncobj handler implementation for explicit GPU synchronization
+impl DrmSyncobjHandler for WaylandServerState {
+    fn drm_syncobj_state(&mut self) -> &mut DrmSyncobjState {
+        self.drm_syncobj_state.as_mut().expect("DrmSyncobjState not initialized - ensure initialize_wl_drm() was called")
+    }
+}
+
 // Delegate handlers to implementations
 smithay::delegate_compositor!(WaylandServerState);
 smithay::delegate_xdg_shell!(WaylandServerState);
@@ -562,3 +622,4 @@ smithay::delegate_dmabuf!(WaylandServerState);
 smithay::delegate_seat!(WaylandServerState);
 smithay::delegate_relative_pointer!(WaylandServerState);
 smithay::delegate_pointer_constraints!(WaylandServerState);
+smithay::delegate_drm_syncobj!(WaylandServerState);

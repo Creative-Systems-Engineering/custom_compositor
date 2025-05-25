@@ -1,6 +1,6 @@
 # Advanced Wayland Compositor Architecture
 
-A sophisticated, high-performance Wayland compositor engineered with Rust and Vulkan, specifically architected for professional 4K UI/UX development on Linux systems. This project establishes a new paradigm in desktop computing capable of supporting the most demanding professional graphics applications including Blender, Autodesk Maya, Unity, Unreal Engine, Adobe Creative Suite, and other complex rendering workloads through comprehensive Wayland protocol implementation and Vulkan-accelerated compositing.
+A sophisticated, high-performance Wayland compositor engineered with Rust and Vulkan, specifically architected for professional 4K UI/UX development on Linux systems. This project establishes a new paradigm in desktop computing, enabling seamless operation of the most demanding professional graphics applications including Blender, Autodesk Maya, Cinema 4D, ZBrush, Unity, Unreal Engine, Godot, Adobe Creative Suite, DaVinci Resolve, OBS Studio, and complex CAD/engineering applications. Through comprehensive Wayland protocol implementation and Vulkan-accelerated compositing architecture, this compositor delivers the performance and reliability required for professional development workflows and production environments.
 
 ## Technical Vision
 
@@ -48,7 +48,7 @@ crates/
 ├── compositor-core/     # Advanced Wayland compositor implementation with protocol mastery
 ├── vulkan-renderer/     # High-performance GPU rendering engine with memory optimization
 ├── ui-framework/        # Proprietary UI system featuring modern aesthetic algorithms
-├── app-bar/            # Extensible application interface with adaptive behavior
+├── app-bar/            # Professional graphics workflow interface for demanding applications
 ├── plugin-system/      # Dynamic plugin architecture with hot-loading capabilities
 ├── config/             # Advanced configuration management with live reload
 ├── ipc/                # Inter-process communication with security isolation
@@ -316,7 +316,7 @@ Each crate serves a specialized architectural function:
 - **`compositor-core`**: The foundational Wayland compositor implementation, managing advanced window systems, input processing, and comprehensive protocol support
 - **`vulkan-renderer`**: Sophisticated abstraction layer over Vulkan providing high-performance GPU rendering with memory optimization
 - **`ui-framework`**: Proprietary UI system engineered for advanced visual effects and 4K display optimization
-- **`app-bar`**: Extensible application interface designed for professional workflow integration and adaptive behavior
+- **`app-bar`**: Professional graphics workflow interface optimized for demanding applications like Blender, Unity, and CAD software
 - **`plugin-system`**: Dynamic plugin loading and management system with security isolation and hot-reload capabilities
 - **`config`**: Advanced configuration file processing and runtime configuration management with live reload
 - **`ipc`**: Inter-process communication infrastructure for plugin and client interaction with security boundaries
