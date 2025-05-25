@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "Side-docked app bar component - flagship feature of the compositor"
+description = "Intelligent application bar system with advanced spatial positioning, multi-display topology awareness, and dynamic interaction paradigms"
 
 [dependencies]
 # Local dependencies

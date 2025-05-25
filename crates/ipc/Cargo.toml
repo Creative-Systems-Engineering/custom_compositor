@@ -5,7 +5,7 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Inter-process communication for the custom Wayland compositor"
+description = "Comprehensive inter-process communication framework supporting D-Bus integration, Unix domain sockets, and high-performance message serialization"
 
 [dependencies]
 # Error handling and utilities

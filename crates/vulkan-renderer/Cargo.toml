@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "Vulkan-based renderer for the custom compositor"
+description = "High-performance Vulkan rendering engine optimized for ultra-high-resolution compositor operations and GPU-accelerated visual effects"
 
 [dependencies]
 # Local dependencies

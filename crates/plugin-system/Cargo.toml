@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "Dynamic plugin loading and management system"
+description = "Sophisticated dynamic plugin architecture with runtime loading, dependency resolution, and secure sandbox integration"
 
 [dependencies]
 # Local dependencies

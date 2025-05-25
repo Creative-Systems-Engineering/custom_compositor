@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "Custom UI framework with glassmorphism and neomorphism support"
+description = "Advanced UI framework implementing cutting-edge glassmorphism and neomorphism aesthetics with hardware-accelerated visual effects"
 
 [dependencies]
 # Local dependencies
