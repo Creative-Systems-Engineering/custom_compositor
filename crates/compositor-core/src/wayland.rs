@@ -5,7 +5,7 @@ use drm_fourcc::{DrmFourcc, DrmModifier};
 use smithay::{
     backend::allocator::{dmabuf::Dmabuf, Buffer, Format},
     desktop::{Space, Window},
-    input::{Seat, SeatHandler, SeatState},
+    input::{Seat, SeatHandler, SeatState, pointer::PointerHandle},
     output::{Output, PhysicalProperties, Subpixel},
     wayland::output::{OutputHandler, OutputManagerState},
     reexports::{
@@ -16,15 +16,16 @@ use smithay::{
             Display, Resource,
         },
     },
-    utils::{Clock, Monotonic, Serial},
+    utils::{Clock, Monotonic, Serial, Point, Logical},
     wayland::{
         buffer::BufferHandler,
         compositor::{CompositorClientState, CompositorHandler, CompositorState, with_states},
         dmabuf::{DmabufHandler, DmabufState, DmabufGlobal, ImportNotifier},
+        pointer_constraints::{PointerConstraintsHandler, PointerConstraintsState},
         relative_pointer::RelativePointerManagerState,
         shell::xdg::{
             PopupSurface, PositionerState, ToplevelSurface, XdgShellHandler, XdgShellState,
-  _      },
+        },
         shm::{ShmHandler, ShmState},
         socket::ListeningSocketSource,
     },
@@ -52,6 +53,7 @@ pub struct WaylandServerState {
     pub dmabuf_global: DmabufGlobal,
     pub output_manager_state: OutputManagerState,
     pub relative_pointer_manager_state: RelativePointerManagerState,
+    pub pointer_constraints_state: PointerConstraintsState,
     pub seat_state: SeatState<Self>,
     pub space: Space<Window>,
     pub clock: Clock<Monotonic>,
@@ -116,6 +118,9 @@ impl WaylandServer {
         // Initialize relative pointer manager for 3D viewport navigation and gaming
         let relative_pointer_manager_state = RelativePointerManagerState::new::<WaylandServerState>(&dh);
         
+        // Initialize pointer constraints for 3D viewport navigation and gaming
+        let pointer_constraints_state = PointerConstraintsState::new::<WaylandServerState>(&dh);
+        
         // Create default output (4K setup)
         let output = Output::new(
             "custom-compositor-output".to_string(),
@@ -151,6 +156,7 @@ impl WaylandServer {
             dmabuf_global,
             output_manager_state,
             relative_pointer_manager_state,
+            pointer_constraints_state,
             seat_state,
             space,
             clock,
@@ -429,6 +435,27 @@ impl OutputHandler for WaylandServerState {
     }
 }
 
+// Pointer constraints handler implementation for precise pointer control
+impl PointerConstraintsHandler for WaylandServerState {
+    fn new_constraint(&mut self, surface: &WlSurface, pointer: &PointerHandle<Self>) {
+        info!("New pointer constraint created for surface: {:?}", surface.id());
+        debug!("Pointer constraint established for pointer: {:?}", pointer);
+        
+        // TODO: Handle constraint activation based on focus and surface state
+        // TODO: Implement constraint region validation
+        // TODO: Integrate with input handling system for constraint enforcement
+    }
+    
+    fn cursor_position_hint(&mut self, surface: &WlSurface, pointer: &PointerHandle<Self>, location: Point<f64, Logical>) {
+        debug!("Cursor position hint received for surface: {:?}, location: {:?}", surface.id(), location);
+        debug!("Position hint for pointer: {:?}", pointer);
+        
+        // TODO: Update cursor position based on hint for locked pointer constraints
+        // TODO: Validate hint location against constraint region
+        // TODO: Apply position hint to compositor cursor state
+    }
+}
+
 // Delegate handlers to implementations
 smithay::delegate_compositor!(WaylandServerState);
 smithay::delegate_xdg_shell!(WaylandServerState);
@@ -437,3 +464,4 @@ smithay::delegate_shm!(WaylandServerState);
 smithay::delegate_dmabuf!(WaylandServerState);
 smithay::delegate_seat!(WaylandServerState);
 smithay::delegate_relative_pointer!(WaylandServerState);
+smithay::delegate_pointer_constraints!(WaylandServerState);

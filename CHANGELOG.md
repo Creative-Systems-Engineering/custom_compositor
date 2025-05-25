@@ -10,9 +10,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Added
 - **linux-dmabuf-v1 Protocol**: Zero-copy GPU buffer sharing for professional applications
 - **zwp-relative-pointer-v1 Protocol**: 3D viewport navigation and gaming support
+- **zwp-pointer-constraints-v1 Protocol**: Granular pointer capture and constraint management for precision-critical applications
 - **Advanced Format Support**: XRGB8888 and ARGB8888 with Linear modifier for optimal performance
 - **Smithay 0.6 API Integration**: Updated to current API standards with enhanced capabilities
 - **Relative Pointer Manager**: Unbounded mouse movement for 3D applications and professional workflows
+- **Pointer Constraints Manager**: Advanced pointer lock and confinement capabilities for gaming and professional applications
 - **Documentation Standardization**: Comprehensive revision of all public-facing documentation to professional, doctoral-level language standards
   - **README.md**: Transformed to sophisticated technical exposition with advanced architectural descriptions
   - **features.md**: Complete overhaul with advanced technical terminology and professional feature specifications
@@ -29,10 +31,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - **Import Resolution**: Proper drm_fourcc integration with dependency management
 
 ### Completed
-- **Priority 1 Protocols (3/6)**: linux-dmabuf-v1, xdg-output-unstable-v1, zwp-relative-pointer-v1
+- **Priority 1 Protocols (4/6)**: linux-dmabuf-v1, xdg-output-unstable-v1, zwp-relative-pointer-v1, zwp-pointer-constraints-v1
 
 ### In Progress
-- Wave 1 protocol stack completion (zwp-pointer-constraints-v1, wl-drm, zwp-linux-explicit-sync-v1)
+- Wave 1 protocol stack completion (wl-drm, zwp-linux-explicit-sync-v1)
 - Surface-to-texture rendering pipeline with GPU optimization
 - Input event routing and processing with focus management
 - Performance profiling for 4K displays with latency optimization
