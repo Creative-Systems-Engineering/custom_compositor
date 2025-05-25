@@ -45,3 +45,22 @@ This custom compositor will be built from the ground up, leveraging the latest i
 - Develop in phases, starting with a minimal working compositor and iteratively adding features requirede for a glassmorphism/neomorphism UI.
 - Ensure the code is well-tested, with a focus on testing after every feature.
 Use this file as your north star. Lead the development like a senior systems engineer with deep graphics and Linux experience.
+
+
+## Common Tasks, Best Practices, and Guidelines
+- A dev session is from the time i start developing until i stop. There isnt any criteria or goal per session. All of that is taken care of by the changelog, features.md and development diary.
+- You should be using the changelog to track all changes made to the codebase. This includes new features, bug fixes, and any other significant changes. The changelog should be updated at the end of each protocol/feature implementation.
+- You should be using the features.md file to track all features that are planned for the project. This includes new features, bug fixes, and any other significant changes. The features.md file should be updated at the end of each protocol/feature implementation.
+- You should be using the development diary to track all changes made to the codebase. This includes new features, bug fixes, and any other significant changes. The development diary should be appended to at the end of each protocol/feature implementation.  The diary doesnt have any criteria or gboals. its simply a record of what was done in the session.
+- You should be using the README.md file to track all changes made to the codebase. This includes new features, bug fixes, and any other significant changes. The README.md file should be updated at the end of each protocol/feature implementation.  Remember this is a public repo and the README.md should be written in a way that is easy to understand for someone who is not familiar with the project. The README.md should be updated at the end of each protocol/feature implementation.
+- When updating public facing files, you should use a professional, doctoral level language. This includes the README.md, features.md, and changelog.md files. The language should be clear, concise, and easy to understand.  Remember, we're creating an entire compositor from the ground up to support even the most demanding and advanced applications, UI/UX and desktops. It's OK to 'brag' when describing the project, we've earned the right! The tone should be professional and authoritative. The writing should be free of jargon and technical terms that may not be familiar to the reader. The writing should be engaging and interesting to read.
+- We're not in high-school! Dont use imoticons, emojis or any other childish writing. This is a professional project and the writing should reflect that. The writing should be engaging and interesting to read.
+- Dont be demeaning or condescending. If you think you've used language that may not be understood because of the technical nature, add a description at a slightly lower level. This way the user can understand what your saying without feeling inferior.
+
+## USE DOCUMENTATION!!!
+- The user has went through the trouble to gather documentation for you and in some cases has even downloaded entire websites for you. Use it! If you need to know how to do something, look in the documentation first. If you can't find it there, then look on the internet. If you still can't find it, then ask the user.
+- Smithay = file:///home/shane/vscode/custom_compositor/target/doc/smithay/index.html
+- Rust = /manuals/rust.md
+- Vulkan/Rust Implementation Tutorials = /manuals/vulkan.md
+- XDG = https://docs.piston.rs/piston_window/xdg/index.html
+- Wayland = https://wayland.freedesktop.org/docs/html/

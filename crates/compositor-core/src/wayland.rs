@@ -24,7 +24,7 @@ use smithay::{
         relative_pointer::RelativePointerManagerState,
         shell::xdg::{
             PopupSurface, PositionerState, ToplevelSurface, XdgShellHandler, XdgShellState,
-        },
+  _      },
         shm::{ShmHandler, ShmState},
         socket::ListeningSocketSource,
     },
