@@ -32,6 +32,7 @@ use smithay::{
         relative_pointer::RelativePointerManagerState,
         shell::xdg::{
             PopupSurface, PositionerState, ToplevelSurface, XdgShellHandler, XdgShellState,
+            decoration::{XdgDecorationHandler, XdgDecorationState},
         },
         shm::{ShmHandler, ShmState},
         socket::ListeningSocketSource,
@@ -61,6 +62,7 @@ pub struct WaylandServerState {
     pub output_manager_state: OutputManagerState,
     pub relative_pointer_manager_state: RelativePointerManagerState,
     pub pointer_constraints_state: PointerConstraintsState,
+    pub xdg_decoration_state: XdgDecorationState,
     pub drm_syncobj_state: Option<DrmSyncobjState>,
     pub seat_state: SeatState<Self>,
     pub space: Space<Window>,
@@ -137,6 +139,9 @@ impl WaylandServer {
         // Initialize pointer constraints for 3D viewport navigation and gaming
         let pointer_constraints_state = PointerConstraintsState::new::<WaylandServerState>(&dh);
         
+        // Initialize XDG decoration manager for client-side/server-side decoration control
+        let xdg_decoration_state = XdgDecorationState::new::<WaylandServerState>(&dh);
+        
         // Create default output (4K setup)
         let output = Output::new(
             "custom-compositor-output".to_string(),
@@ -173,6 +178,7 @@ impl WaylandServer {
             output_manager_state,
             relative_pointer_manager_state,
             pointer_constraints_state,
+            xdg_decoration_state,
             drm_syncobj_state: None, // Will be initialized when DRM device is configured
             seat_state,
             space,
@@ -613,6 +619,62 @@ impl DrmSyncobjHandler for WaylandServerState {
     }
 }
 
+// XDG decoration handler implementation for client/server-side decoration control
+impl XdgDecorationHandler for WaylandServerState {
+    fn new_decoration(&mut self, toplevel: ToplevelSurface) {
+        info!("Client requested decoration support for toplevel window");
+        
+        // Configure server-side decorations by default for consistent glassmorphism theming
+        toplevel.with_pending_state(|state| {
+            state.decoration_mode = Some(wayland_protocols::xdg::decoration::zv1::server::zxdg_toplevel_decoration_v1::Mode::ServerSide);
+        });
+        toplevel.send_configure();
+        
+        debug!("Configured server-side decorations for toplevel window");
+    }
+    
+    fn request_mode(&mut self, toplevel: ToplevelSurface, mode: wayland_protocols::xdg::decoration::zv1::server::zxdg_toplevel_decoration_v1::Mode) {
+        use wayland_protocols::xdg::decoration::zv1::server::zxdg_toplevel_decoration_v1::Mode;
+        
+        match mode {
+            Mode::ClientSide => {
+                info!("Client requested client-side decorations");
+                toplevel.with_pending_state(|state| {
+                    state.decoration_mode = Some(Mode::ClientSide);
+                });
+            }
+            Mode::ServerSide => {
+                info!("Client requested server-side decorations");
+                toplevel.with_pending_state(|state| {
+                    state.decoration_mode = Some(Mode::ServerSide);
+                });
+            }
+            _ => {
+                warn!("Client requested unknown decoration mode: {:?}", mode);
+                // Default to server-side for glassmorphism integration
+                toplevel.with_pending_state(|state| {
+                    state.decoration_mode = Some(Mode::ServerSide);
+                });
+            }
+        }
+        
+        toplevel.send_configure();
+        debug!("Applied decoration mode: {:?}", mode);
+    }
+    
+    fn unset_mode(&mut self, toplevel: ToplevelSurface) {
+        info!("Client unset decoration mode preference");
+        
+        // Default to server-side decorations for consistent theming
+        toplevel.with_pending_state(|state| {
+            state.decoration_mode = Some(wayland_protocols::xdg::decoration::zv1::server::zxdg_toplevel_decoration_v1::Mode::ServerSide);
+        });
+        toplevel.send_configure();
+        
+        debug!("Reset to server-side decorations (default)");
+    }
+}
+
 // Delegate handlers to implementations
 smithay::delegate_compositor!(WaylandServerState);
 smithay::delegate_xdg_shell!(WaylandServerState);
@@ -622,4 +684,5 @@ smithay::delegate_dmabuf!(WaylandServerState);
 smithay::delegate_seat!(WaylandServerState);
 smithay::delegate_relative_pointer!(WaylandServerState);
 smithay::delegate_pointer_constraints!(WaylandServerState);
+smithay::delegate_xdg_decoration!(WaylandServerState);
 smithay::delegate_drm_syncobj!(WaylandServerState);

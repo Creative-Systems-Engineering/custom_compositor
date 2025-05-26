@@ -13,7 +13,7 @@
 
 ### Tier 2 - Professional Application Enhancement
 
-- [ ] **xdg-decoration-unstable-v1** - Client-side decoration management with compositor-level override capabilities
+- [x] **xdg-decoration-unstable-v1** - Client-side decoration management with compositor-level override capabilities ✅ IMPLEMENTED
 - [ ] **zwp-tablet-v2** - Professional graphics tablet integration with pressure sensitivity and tilt detection
 - [ ] **zwp-primary-selection-v1** - Advanced clipboard functionality with multi-format selection buffers
 - [ ] **xdg-foreign-unstable-v1** - Cross-surface window embedding for complex application architectures
