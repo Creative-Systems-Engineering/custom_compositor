@@ -530,13 +530,13 @@ impl CompositorHandler for WaylandServerState {
             // TODO: Send buffer data to renderer
         });
         
-        // Provide presentation feedback for wp-presentation-time protocol
-        // This gives clients precise timing information for their frames
-        if let Ok(presentation_feedback) = self.presentation_state.surface_commit_feedback(surface) {
-            // Get the current timestamp using the configured clock (CLOCK_MONOTONIC)
-            let timestamp = self.clock.now();
-            
-            // Schedule presentation feedback to be sent when the frame is actually displayed
+        // Schedule a repaint for this surface
+        self.space.refresh();
+        
+        // TODO: Trigger actual frame rendering in compositor
+        debug!("Surface commit processed, space refreshed");
+    }
+}
 
 impl XdgShellHandler for WaylandServerState {
     fn xdg_shell_state(&mut self) -> &mut XdgShellState {
