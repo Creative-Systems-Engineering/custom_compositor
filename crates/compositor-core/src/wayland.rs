@@ -44,6 +44,8 @@ use smithay::{
             decoration::{XdgDecorationHandler, XdgDecorationState},
         },
         shm::{ShmHandler, ShmState},
+        viewporter::ViewporterState,
+        xdg_foreign::{XdgForeignHandler, XdgForeignState},
         socket::ListeningSocketSource,
     },
 };
@@ -74,7 +76,9 @@ pub struct WaylandServerState {
     pub presentation_state: PresentationState,
     pub primary_selection_state: PrimarySelectionState,
     pub xdg_decoration_state: XdgDecorationState,
+    pub xdg_foreign_state: XdgForeignState,
     pub tablet_manager_state: TabletManagerState,
+    pub viewporter_state: ViewporterState,
     pub drm_syncobj_state: Option<DrmSyncobjState>,
     pub seat_state: SeatState<Self>,
     pub space: Space<Window>,
@@ -160,6 +164,12 @@ impl WaylandServer {
         // Initialize XDG decoration manager for client-side/server-side decoration control
         let xdg_decoration_state = XdgDecorationState::new::<WaylandServerState>(&dh);
         
+        // Initialize xdg-foreign for cross-surface window embedding
+        let xdg_foreign_state = XdgForeignState::new::<WaylandServerState>(&dh);
+        
+        // Initialize viewporter for advanced viewport transformation
+        let viewporter_state = ViewporterState::new::<WaylandServerState>(&dh);
+        
         // Initialize tablet manager for professional graphics tablet integration
         let tablet_manager_state = TabletManagerState::new::<WaylandServerState>(&dh);
         
@@ -202,7 +212,9 @@ impl WaylandServer {
             presentation_state,
             primary_selection_state,
             xdg_decoration_state,
+            xdg_foreign_state,
             tablet_manager_state,
+            viewporter_state,
             drm_syncobj_state: None, // Will be initialized when DRM device is configured
             seat_state,
             space,
@@ -729,6 +741,23 @@ impl TabletSeatHandler for WaylandServerState {
     // Let the compiler tell us what methods we need to implement
 }
 
+// ============================================================================
+// Viewporter Implementation
+// ============================================================================
+
+// Viewporter doesn't require a handler trait implementation
+// It's managed directly through the ViewporterState and delegate_viewporter! macro
+
+// ============================================================================
+// XDG Foreign Handler Implementation
+// ============================================================================
+
+impl XdgForeignHandler for WaylandServerState {
+    fn xdg_foreign_state(&mut self) -> &mut XdgForeignState {
+        &mut self.xdg_foreign_state
+    }
+}
+
 // Delegate handlers to implementations
 smithay::delegate_compositor!(WaylandServerState);
 smithay::delegate_xdg_shell!(WaylandServerState);
@@ -741,5 +770,7 @@ smithay::delegate_pointer_constraints!(WaylandServerState);
 smithay::delegate_presentation!(WaylandServerState);
 smithay::delegate_primary_selection!(WaylandServerState);
 smithay::delegate_xdg_decoration!(WaylandServerState);
+smithay::delegate_xdg_foreign!(WaylandServerState);
 smithay::delegate_tablet_manager!(WaylandServerState);
+smithay::delegate_viewporter!(WaylandServerState);
 smithay::delegate_drm_syncobj!(WaylandServerState);
