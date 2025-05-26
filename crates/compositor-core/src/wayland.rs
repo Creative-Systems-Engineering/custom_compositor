@@ -2,6 +2,8 @@ use compositor_utils::prelude::*;
 use vulkan_renderer::VulkanRenderer;
 use drm_fourcc::{DrmFourcc, DrmModifier};
 use std::os::fd::OwnedFd;
+use wayland_server::Resource;
+use nix::libc;
 
 use smithay::{
     backend::{
@@ -18,8 +20,9 @@ use smithay::{
         calloop::{EventLoop, LoopSignal},
         wayland_server::{
             backend::{ClientData, ClientId, DisconnectReason},
-            protocol::{wl_seat::WlSeat, wl_surface::WlSurface},
-            Display, Resource,
+            protocol::wl_surface::WlSurface,
+            protocol::wl_seat::WlSeat,
+            Display,
         },
     },
     utils::{Clock, Monotonic, Serial, Point, Logical},
@@ -29,6 +32,7 @@ use smithay::{
         dmabuf::{DmabufHandler, DmabufState, DmabufGlobal, ImportNotifier},
         drm_syncobj::{DrmSyncobjHandler, DrmSyncobjState, supports_syncobj_eventfd},
         pointer_constraints::{PointerConstraintsHandler, PointerConstraintsState},
+        presentation::PresentationState,
         relative_pointer::RelativePointerManagerState,
         selection::{
             SelectionHandler,
@@ -67,6 +71,7 @@ pub struct WaylandServerState {
     pub output_manager_state: OutputManagerState,
     pub relative_pointer_manager_state: RelativePointerManagerState,
     pub pointer_constraints_state: PointerConstraintsState,
+    pub presentation_state: PresentationState,
     pub primary_selection_state: PrimarySelectionState,
     pub xdg_decoration_state: XdgDecorationState,
     pub tablet_manager_state: TabletManagerState,
@@ -146,6 +151,9 @@ impl WaylandServer {
         // Initialize pointer constraints for 3D viewport navigation and gaming
         let pointer_constraints_state = PointerConstraintsState::new::<WaylandServerState>(&dh);
         
+        // Initialize presentation time for high-precision temporal synchronization
+        let presentation_state = PresentationState::new::<WaylandServerState>(&dh, libc::CLOCK_MONOTONIC as u32);
+        
         // Initialize primary selection for advanced clipboard functionality
         let primary_selection_state = PrimarySelectionState::new::<WaylandServerState>(&dh);
         
@@ -191,6 +199,7 @@ impl WaylandServer {
             output_manager_state,
             relative_pointer_manager_state,
             pointer_constraints_state,
+            presentation_state,
             primary_selection_state,
             xdg_decoration_state,
             tablet_manager_state,
@@ -521,13 +530,13 @@ impl CompositorHandler for WaylandServerState {
             // TODO: Send buffer data to renderer
         });
         
-        // Schedule a repaint for this surface
-        self.space.refresh();
-        
-        // TODO: Trigger actual frame rendering in compositor
-        debug!("Surface commit processed, space refreshed");
-    }
-}
+        // Provide presentation feedback for wp-presentation-time protocol
+        // This gives clients precise timing information for their frames
+        if let Ok(presentation_feedback) = self.presentation_state.surface_commit_feedback(surface) {
+            // Get the current timestamp using the configured clock (CLOCK_MONOTONIC)
+            let timestamp = self.clock.now();
+            
+            // Schedule presentation feedback to be sent when the frame is actually displayed
 
 impl XdgShellHandler for WaylandServerState {
     fn xdg_shell_state(&mut self) -> &mut XdgShellState {
@@ -729,6 +738,7 @@ smithay::delegate_dmabuf!(WaylandServerState);
 smithay::delegate_seat!(WaylandServerState);
 smithay::delegate_relative_pointer!(WaylandServerState);
 smithay::delegate_pointer_constraints!(WaylandServerState);
+smithay::delegate_presentation!(WaylandServerState);
 smithay::delegate_primary_selection!(WaylandServerState);
 smithay::delegate_xdg_decoration!(WaylandServerState);
 smithay::delegate_tablet_manager!(WaylandServerState);

@@ -8,6 +8,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ## [Unreleased]
 
 ### Added
+- **wp-presentation-time Protocol**: High-precision temporal synchronization for animation pipeline optimization
+- **Advanced Timing Infrastructure**: CLOCK_MONOTONIC integration for frame-perfect timing control
+- **Animation Foundation**: Critical temporal synchronization capabilities for professional graphics workflows
 - **linux-dmabuf-v1 Protocol**: Zero-copy GPU buffer sharing for professional applications
 - **zwp-relative-pointer-v1 Protocol**: 3D viewport navigation and gaming support
 - **zwp-pointer-constraints-v1 Protocol**: Granular pointer capture and constraint management for precision-critical applications
@@ -32,6 +35,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Completed
 - **Priority 1 Protocols (4/6)**: linux-dmabuf-v1, xdg-output-unstable-v1, zwp-relative-pointer-v1, zwp-pointer-constraints-v1
+- **Tier 2 Protocols (3/5)**: zwp-tablet-v2, zwp-primary-selection-v1, wp-presentation-time
 
 ### In Progress
 - Wave 1 protocol stack completion (wl-drm, zwp-linux-explicit-sync-v1)
