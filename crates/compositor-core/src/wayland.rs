@@ -30,6 +30,11 @@ use smithay::{
         drm_syncobj::{DrmSyncobjHandler, DrmSyncobjState, supports_syncobj_eventfd},
         pointer_constraints::{PointerConstraintsHandler, PointerConstraintsState},
         relative_pointer::RelativePointerManagerState,
+        selection::{
+            SelectionHandler,
+            primary_selection::{PrimarySelectionHandler, PrimarySelectionState},
+        },
+        tablet_manager::{TabletManagerState, TabletSeatHandler},
         shell::xdg::{
             PopupSurface, PositionerState, ToplevelSurface, XdgShellHandler, XdgShellState,
             decoration::{XdgDecorationHandler, XdgDecorationState},
@@ -62,7 +67,9 @@ pub struct WaylandServerState {
     pub output_manager_state: OutputManagerState,
     pub relative_pointer_manager_state: RelativePointerManagerState,
     pub pointer_constraints_state: PointerConstraintsState,
+    pub primary_selection_state: PrimarySelectionState,
     pub xdg_decoration_state: XdgDecorationState,
+    pub tablet_manager_state: TabletManagerState,
     pub drm_syncobj_state: Option<DrmSyncobjState>,
     pub seat_state: SeatState<Self>,
     pub space: Space<Window>,
@@ -139,8 +146,14 @@ impl WaylandServer {
         // Initialize pointer constraints for 3D viewport navigation and gaming
         let pointer_constraints_state = PointerConstraintsState::new::<WaylandServerState>(&dh);
         
+        // Initialize primary selection for advanced clipboard functionality
+        let primary_selection_state = PrimarySelectionState::new::<WaylandServerState>(&dh);
+        
         // Initialize XDG decoration manager for client-side/server-side decoration control
         let xdg_decoration_state = XdgDecorationState::new::<WaylandServerState>(&dh);
+        
+        // Initialize tablet manager for professional graphics tablet integration
+        let tablet_manager_state = TabletManagerState::new::<WaylandServerState>(&dh);
         
         // Create default output (4K setup)
         let output = Output::new(
@@ -178,7 +191,9 @@ impl WaylandServer {
             output_manager_state,
             relative_pointer_manager_state,
             pointer_constraints_state,
+            primary_selection_state,
             xdg_decoration_state,
+            tablet_manager_state,
             drm_syncobj_state: None, // Will be initialized when DRM device is configured
             seat_state,
             space,
@@ -675,6 +690,36 @@ impl XdgDecorationHandler for WaylandServerState {
     }
 }
 
+// ============================================================================
+// Primary Selection Handler Implementation  
+// ============================================================================
+
+// ============================================================================
+// Selection Handler Implementation
+// ============================================================================
+
+impl SelectionHandler for WaylandServerState {
+    type SelectionUserData = ();
+}
+
+// ============================================================================
+// Primary Selection Handler Implementation  
+// ============================================================================
+
+impl PrimarySelectionHandler for WaylandServerState {
+    fn primary_selection_state(&self) -> &PrimarySelectionState {
+        &self.primary_selection_state
+    }
+}
+
+// ============================================================================
+// Tablet Manager Handler Implementation
+// ============================================================================
+
+impl TabletSeatHandler for WaylandServerState {
+    // Let the compiler tell us what methods we need to implement
+}
+
 // Delegate handlers to implementations
 smithay::delegate_compositor!(WaylandServerState);
 smithay::delegate_xdg_shell!(WaylandServerState);
@@ -684,5 +729,7 @@ smithay::delegate_dmabuf!(WaylandServerState);
 smithay::delegate_seat!(WaylandServerState);
 smithay::delegate_relative_pointer!(WaylandServerState);
 smithay::delegate_pointer_constraints!(WaylandServerState);
+smithay::delegate_primary_selection!(WaylandServerState);
 smithay::delegate_xdg_decoration!(WaylandServerState);
+smithay::delegate_tablet_manager!(WaylandServerState);
 smithay::delegate_drm_syncobj!(WaylandServerState);
