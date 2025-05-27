@@ -15,6 +15,7 @@ vulkan-renderer = { path = "../vulkan-renderer" }
 smithay = { workspace = true }
 wayland-server = { workspace = true }
 wayland-protocols = { workspace = true }
+wayland-protocols-misc = { workspace = true }
 calloop = { workspace = true }
 drm-fourcc = { workspace = true }
 

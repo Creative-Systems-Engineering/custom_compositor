@@ -382,6 +382,7 @@ dependencies = [
  "tracing",
  "vulkan-renderer",
  "wayland-protocols",
+ "wayland-protocols-misc",
  "wayland-server",
 ]
 

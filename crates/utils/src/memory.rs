@@ -6,6 +6,12 @@ pub struct MemoryTracker {
     peak_allocated: AtomicUsize,
 }
 
+impl Default for MemoryTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MemoryTracker {
     pub const fn new() -> Self {
         Self {

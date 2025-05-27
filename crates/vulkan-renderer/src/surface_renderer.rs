@@ -424,7 +424,6 @@ impl SurfaceRenderer {
                     height: texture.height,
                     depth: 1,
                 },
-                ..Default::default()
             };
             
             self.device.handle().cmd_copy_buffer_to_image(

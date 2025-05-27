@@ -4,7 +4,6 @@ use drm_fourcc::{DrmFourcc, DrmModifier};
 use std::os::fd::OwnedFd;
 use wayland_server::Resource;
 use nix::libc;
-
 use smithay::{
     backend::{
         allocator::{dmabuf::Dmabuf, Buffer, Format, gbm::GbmDevice},
@@ -806,10 +805,6 @@ impl XdgDecorationHandler for WaylandServerState {
         debug!("Reset to server-side decorations (default)");
     }
 }
-
-// ============================================================================
-// Primary Selection Handler Implementation  
-// ============================================================================
 
 // ============================================================================
 // Selection Handler Implementation

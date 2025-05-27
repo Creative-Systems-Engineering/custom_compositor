@@ -1,7 +1,7 @@
 // Placeholder modules for Vulkan renderer components
 // These will be expanded in future sessions
 
-pub mod pipeline {}
+pub mod graphics_pipeline {}
 pub mod memory {}
 pub mod command {}
 pub mod sync {}

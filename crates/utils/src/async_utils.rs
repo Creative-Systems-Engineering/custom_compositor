@@ -76,10 +76,7 @@ impl TaskQueueHandle {
     
     /// Try to process one task if available
     pub fn try_process_one(&mut self) -> Option<BoxFuture<'static, ()>> {
-        match self.receiver.try_recv() {
-            Ok(task) => Some(task),
-            Err(_) => None,
-        }
+        self.receiver.try_recv().ok()
     }
 }
 

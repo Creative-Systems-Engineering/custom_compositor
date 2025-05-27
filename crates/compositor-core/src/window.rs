@@ -2,7 +2,7 @@
 // These will be expanded in future sessions
 
 /// Window management and layout
-pub mod window {
+pub mod window_manager {
     pub struct Window {
         // Placeholder
     }

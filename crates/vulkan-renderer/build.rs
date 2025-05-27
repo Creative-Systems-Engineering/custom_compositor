@@ -14,8 +14,8 @@ fn main() {
     fs::create_dir_all(&output_dir).expect("Failed to create shader output directory");
     
     // Compile shaders
-    compile_shader(&shader_dir, &output_dir, "surface.vert");
-    compile_shader(&shader_dir, &output_dir, "surface.frag");
+    compile_shader(shader_dir, &output_dir, "surface.vert");
+    compile_shader(shader_dir, &output_dir, "surface.frag");
     
     println!("Shaders compiled successfully");
 }
