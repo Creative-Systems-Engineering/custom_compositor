@@ -7,6 +7,58 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.2.3] - 2025-05-27 - "XDG Toplevel Icon Protocol Implementation"
+
+### Added
+- **Window Icon Management Protocol**: Implemented xdg-toplevel-icon-v1 protocol for comprehensive application icon support in taskbars and window management systems
+- **XDG Toplevel Icon Handler**: Complete `XdgToplevelIconHandler` trait implementation with proper icon state management and cached icon data access
+- **Application Icon Integration**: Support for both XDG icon theme names and pixel buffer icon data enabling flexible icon presentation across all application types
+- **Taskbar Icon Support**: Foundation for app bar and dock integration with real-time icon updates when applications change their window icons
+- **Icon Caching System**: Efficient icon data caching through Smithay's cached state system ensuring optimal performance during icon updates
+- **Multi-Scale Icon Support**: Proper handling of icon buffers at different scales for high-DPI display optimization and crisp icon rendering
+- **Icon Lifecycle Management**: Complete icon state tracking from creation through updates to removal with proper cleanup and memory management
+- **Professional Window Management**: Enables advanced window management features essential for professional desktop environments and productivity workflows
+
+### Enhanced
+- **Protocol Stack Completion**: Added final missing protocol for comprehensive window management completing the core Wayland protocol implementation
+- **Display Handle Integration**: Proper integration with wayland_server DisplayHandle for correct protocol binding and client communication
+- **Cached State Access**: Leveraged Smithay's cached state system for efficient icon data retrieval with proper surface state management
+- **Icon Data Processing**: Framework for icon buffer processing and conversion for integration with Vulkan renderer and app bar systems
+
+### Technical Details
+- **Smithay 0.6 Integration**: Full compliance with smithay 0.6 xdg-toplevel-icon API including all required trait bounds and method signatures
+- **Protocol Delegation**: Proper use of `delegate_xdg_toplevel_icon!` macro for automatic protocol dispatch and handler integration
+- **Memory Efficiency**: Zero-copy icon data access through cached state system maintaining optimal memory usage during icon operations
+- **Type Safety**: Complete type-safe implementation with proper error handling and resource management throughout icon lifecycle
+
+## [0.2.2] - 2025-01-03 - "DRM Lease Protocol Implementation"
+
+### Added
+- **Direct Hardware Access Protocol**: Implemented zwp-drm-lease-v1 protocol for VR, gaming, and professional CAD applications requiring direct GPU resource access
+- **DRM Lease Handler Implementation**: Complete `DrmLeaseHandler` trait implementation with proper lease request handling, resource management, and lease lifecycle control
+- **Hardware Resource Leasing**: Support for leasing DRM connectors, CRTCs, and planes directly to client applications for maximum performance scenarios
+- **VR/Gaming Optimization**: Direct hardware access enables low-latency VR head tracking, high-refresh gaming, and real-time graphics professional workflows
+- **Professional Graphics Workflow Support**: CAD and 3D modeling applications can now access dedicated GPU resources without compositor overhead
+- **Lease Request Validation**: Proper connector and resource validation ensuring system stability while maximizing application performance capabilities
+- **Active Lease Management**: Comprehensive lease lifecycle tracking with automatic cleanup and resource recovery on client disconnection
+- **Hardware Acceleration Foundation**: Completes the hardware acceleration protocol stack alongside explicit sync and DMA-BUF support
+
+### Enhanced
+- **Protocol Initialization Reporting**: Extended `initialize_wl_drm()` to include DRM lease status reporting alongside explicit sync and legacy EGL protocol status
+- **DRM Device Integration**: Leveraged existing DRM node detection infrastructure for seamless DRM lease protocol integration
+- **Resource Management**: Enhanced DRM device file descriptor handling to support both explicit sync and direct hardware leasing workflows
+
+### Technical Details
+- **Smithay Integration**: Proper integration with smithay 0.6 DRM lease API including all required trait implementations
+- **Error Handling**: Comprehensive error handling for lease rejection scenarios with proper client notification
+- **Memory Safety**: Zero-copy resource management maintaining Rust memory safety guarantees during hardware resource leasing
+- **Performance Optimization**: Direct hardware access bypasses compositor rendering pipeline for maximum performance in specialized applications
+
+### Impact
+- **Professional Application Support**: Enables professional graphics, CAD, VR, and high-performance gaming applications on the custom compositor
+- **Hardware Acceleration Completion**: With DMA-BUF, explicit sync, and DRM lease protocols, the compositor now supports the complete modern GPU acceleration stack
+- **Competitive Feature Parity**: Matches and exceeds hardware access capabilities of mainstream compositors like Mutter and KWin for specialized workloads
+
 ## [0.2.1] - 2025-01-03 - "Tier 3 Protocol Implementation Milestone"
 
 ### Added

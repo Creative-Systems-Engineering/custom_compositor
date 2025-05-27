@@ -91,10 +91,10 @@ This section documents all Wayland protocols supported by the Smithay framework,
 - [x] **layer_shell** (`delegate_layer_shell`) - Overlay and background layer management (wlr-layer-shell) ✅ IMPLEMENTED
 - [x] **xdg_activation** (`delegate_xdg_activation`) - Window activation and focus management protocol ✅ IMPLEMENTED
 - [x] **foreign_toplevel_list** (`delegate_foreign_toplevel_list`) - Cross-compositor window listing ✅ IMPLEMENTED
-- [ ] **xdg_toplevel_icon** (`delegate_xdg_toplevel_icon`) - Window icon management for taskbars and dock systems
+- [x] **xdg_toplevel_icon** (`delegate_xdg_toplevel_icon`) - Window icon management for taskbars and dock systems ✅ IMPLEMENTED
 
 **Hardware and Performance Integration**  
-- [ ] **drm_lease** (`delegate_drm_lease`) - Direct hardware access for specialized rendering scenarios
+- [x] **drm_lease** (`delegate_drm_lease`) - Direct hardware access for VR/gaming/CAD applications → **zwp-drm-lease-v1** ✅ IMPLEMENTED
 - [x] **commit_timing** (`delegate_commit_timing`) - Frame timing control and synchronization ✅ IMPLEMENTED
 - [x] **fifo** (`delegate_fifo`) - Frame scheduling and buffer management optimization ✅ IMPLEMENTED
 

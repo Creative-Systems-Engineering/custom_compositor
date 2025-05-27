@@ -23,6 +23,9 @@ use smithay::{
             protocol::wl_seat::WlSeat,
             Display,
         },
+        wayland_protocols::xdg::{
+            shell::server::xdg_toplevel::XdgToplevel,
+        },
     },
     utils::{Clock, Monotonic, Serial, Point, Logical},
     wayland::{
@@ -55,8 +58,11 @@ use smithay::{
         cursor_shape::CursorShapeManagerState,
         commit_timing::CommitTimerState,
         fifo::FifoManagerState,
-        // drm_lease::{DrmLeaseHandler, DrmLeaseState},  // Requires DrmNode and handler implementation
+        drm_lease::{DrmLeaseHandler, DrmLeaseState},
         xdg_foreign::{XdgForeignHandler, XdgForeignState},
+        xdg_toplevel_icon::{
+            XdgToplevelIconHandler, XdgToplevelIconManager, ToplevelIconCachedState,
+        },
         idle_inhibit::{IdleInhibitHandler, IdleInhibitManagerState},
         keyboard_shortcuts_inhibit::{KeyboardShortcutsInhibitHandler, KeyboardShortcutsInhibitState},
         pointer_gestures::PointerGesturesState,
@@ -100,6 +106,7 @@ pub struct WaylandServerState {
     pub data_device_state: DataDeviceState,
     pub xdg_decoration_state: XdgDecorationState,
     pub xdg_foreign_state: XdgForeignState,
+    pub xdg_toplevel_icon_manager: XdgToplevelIconManager,
     pub tablet_manager_state: TabletManagerState,
     pub viewporter_state: ViewporterState,
     pub fractional_scale_manager_state: FractionalScaleManagerState,
@@ -109,7 +116,7 @@ pub struct WaylandServerState {
     pub cursor_shape_manager_state: CursorShapeManagerState,
     pub commit_timer_state: CommitTimerState,
     pub fifo_manager_state: FifoManagerState,
-    // pub drm_lease_state: DrmLeaseState,  // Requires DrmNode and handler implementation
+    pub drm_lease_state: Option<DrmLeaseState>,
     pub idle_inhibit_manager_state: IdleInhibitManagerState,
     pub keyboard_shortcuts_inhibit_state: KeyboardShortcutsInhibitState,
     pub pointer_gestures_state: PointerGesturesState,
@@ -212,6 +219,9 @@ impl WaylandServer {
         // Initialize xdg-foreign for cross-surface window embedding
         let xdg_foreign_state = XdgForeignState::new::<WaylandServerState>(&dh);
         
+        // Initialize xdg toplevel icon manager for window icon management and taskbar integration
+        let xdg_toplevel_icon_manager = XdgToplevelIconManager::new::<WaylandServerState>(&dh);
+        
         // Initialize viewporter for advanced viewport transformation
         let viewporter_state = ViewporterState::new::<WaylandServerState>(&dh);
         
@@ -263,6 +273,7 @@ impl WaylandServer {
             data_device_state,
             xdg_decoration_state,
             xdg_foreign_state,
+            xdg_toplevel_icon_manager,
             tablet_manager_state,
             viewporter_state,
             fractional_scale_manager_state,
@@ -272,7 +283,7 @@ impl WaylandServer {
             cursor_shape_manager_state: CursorShapeManagerState::new::<WaylandServerState>(&dh),
             commit_timer_state: CommitTimerState::default(),
             fifo_manager_state: FifoManagerState::new::<WaylandServerState>(&dh),
-            // drm_lease_state: DrmLeaseState::new::<WaylandServerState>(&dh), // Requires DrmNode and handler
+            drm_lease_state: None, // Will be initialized when DRM device is configured
             idle_inhibit_manager_state: IdleInhibitManagerState::new::<WaylandServerState>(&dh),
             keyboard_shortcuts_inhibit_state: KeyboardShortcutsInhibitState::new::<WaylandServerState>(&dh),
             pointer_gestures_state: PointerGesturesState::new::<WaylandServerState>(&dh),
@@ -379,6 +390,19 @@ impl WaylandServer {
                 
                 // Store the device fd regardless of sync support for potential future use
                 self.state.drm_device_fd = drm_device_fd;
+                
+                // Initialize DRM lease state for direct hardware access
+                info!("Initializing DRM lease support for VR/gaming/CAD applications");
+                let dh = self.display.handle();
+                match DrmLeaseState::new::<WaylandServerState>(&dh, drm_node) {
+                    Ok(drm_lease_state) => {
+                        self.state.drm_lease_state = Some(drm_lease_state);
+                        info!("✅ DRM lease protocol initialized for direct hardware access");
+                    }
+                    Err(e) => {
+                        warn!("Failed to initialize DRM lease state: {}", e);
+                    }
+                }
             }
             
             // Create GBM device from DRM file descriptor for EGL display
@@ -427,9 +451,16 @@ impl WaylandServer {
             "unavailable" 
         };
         
+        let drm_lease_status = if self.state.drm_lease_state.is_some() { 
+            "initialized" 
+        } else { 
+            "unavailable" 
+        };
+        
         info!("Protocol initialization complete:");
         info!("  • wl_drm (legacy EGL): {}", wl_drm_status);
         info!("  • zwp-linux-explicit-sync-v1 (modern GPU sync): {}", explicit_sync_status);
+        info!("  • zwp-drm-lease-v1 (direct hardware access): {}", drm_lease_status);
         
         Ok(())
     }
@@ -920,6 +951,62 @@ impl XdgForeignHandler for WaylandServerState {
 }
 
 // ============================================================================
+// XDG Toplevel Icon Handler Implementation 
+// ============================================================================
+
+// ============================================================================
+// XDG Toplevel Icon Handler Implementation
+// ============================================================================
+
+impl XdgToplevelIconHandler for WaylandServerState {
+    fn set_icon(&mut self, _toplevel: XdgToplevel, wl_surface: WlSurface) {
+        info!("Icon set for toplevel window: {:?}", wl_surface.id());
+        
+        // Access icon data through cached state system using with_states
+        with_states(&wl_surface, |states| {
+            let mut cached_state = states.cached_state.get::<ToplevelIconCachedState>();
+            let current_icon = cached_state.current();
+            
+            if let Some(icon_name) = current_icon.icon_name() {
+                info!("Toplevel icon set with name: {}", icon_name);
+                
+                // TODO: Load icon from XDG icon theme
+                // TODO: Store icon in compositor's icon cache with name
+                // TODO: Notify app bar of icon update for window
+                
+                debug!("Icon name '{}' ready for app bar integration", icon_name);
+            }
+            
+            let buffers = current_icon.buffers();
+            if !buffers.is_empty() {
+                info!("Toplevel icon set with {} buffer(s)", buffers.len());
+                
+                for (buffer, scale) in buffers {
+                    debug!("Icon buffer: {:?} at scale {}", buffer.id(), scale);
+                    
+                    // TODO: Process icon buffer data for app bar integration
+                    // TODO: Store icon buffer in compositor's icon cache
+                    // TODO: Handle icon scaling for different display densities
+                    // TODO: Convert buffer to format suitable for Vulkan rendering
+                }
+                
+                debug!("Icon buffer data ready for app bar integration and window management");
+            }
+            
+            if current_icon.icon_name().is_none() && buffers.is_empty() {
+                info!("Icon removed for toplevel window: {:?}", wl_surface.id());
+                
+                // TODO: Remove icon from compositor's icon cache
+                // TODO: Notify app bar of icon removal
+                // TODO: Update window management UI to reflect icon removal
+                
+                debug!("Icon removed for window management");
+            }
+        });
+    }
+}
+
+// ============================================================================
 // Idle Inhibit Handler Implementation
 // ============================================================================
 
@@ -1068,6 +1155,51 @@ impl XdgActivationHandler for WaylandServerState {
 }
 
 // ============================================================================
+// DRM Lease Handler Implementation
+// ============================================================================
+
+impl DrmLeaseHandler for WaylandServerState {
+    fn drm_lease_state(&mut self, _node: smithay::backend::drm::DrmNode) -> &mut DrmLeaseState {
+        self.drm_lease_state.as_mut().expect("DrmLeaseState not initialized - ensure initialize_wl_drm() was called")
+    }
+    
+    fn lease_request(
+        &mut self, 
+        _node: smithay::backend::drm::DrmNode, 
+        request: smithay::wayland::drm_lease::DrmLeaseRequest
+    ) -> std::result::Result<smithay::wayland::drm_lease::DrmLeaseBuilder, smithay::wayland::drm_lease::LeaseRejected> {
+        info!("DRM lease request received from client for connectors: {:?}", request.connectors);
+        
+        // TODO: Implement DRM lease request validation and resource allocation using DrmLeaseRequest, DrmLeaseBuilder, LeaseRejected
+        // TODO: Validate requested connectors and CRTCs are available
+        // TODO: Create DrmLeaseBuilder with appropriate resources (connectors, CRTCs, planes)
+        // TODO: Check compositor policy for allowing direct hardware access
+        
+        // For now, reject all lease requests until we implement full resource management
+        warn!("DRM lease request rejected - resource allocation not yet implemented");
+        Err(smithay::wayland::drm_lease::LeaseRejected::default())
+    }
+    
+    fn new_active_lease(&mut self, node: smithay::backend::drm::DrmNode, lease: smithay::wayland::drm_lease::DrmLease) {
+        info!("New DRM lease active for node: {:?}, lease ID: {}", node.dev_path(), lease.id());
+        
+        // TODO: Track active leases for resource management
+        // TODO: Update available resources to exclude leased resources
+        // TODO: Store lease reference for lifecycle management
+        debug!("DRM lease {} activated - direct hardware access granted", lease.id());
+    }
+    
+    fn lease_destroyed(&mut self, node: smithay::backend::drm::DrmNode, lease_id: u32) {
+        info!("DRM lease destroyed for node: {:?}, lease ID: {}", node.dev_path(), lease_id);
+        
+        // TODO: Clean up lease tracking and restore resource availability
+        // TODO: Update compositor state to reflect returned resources
+        // TODO: Remove lease from active lease tracking
+        debug!("DRM lease {} destroyed - resources returned to compositor", lease_id);
+    }
+}
+
+// ============================================================================
 // Foreign Toplevel List Handler Implementation
 // ============================================================================
 
@@ -1092,6 +1224,7 @@ smithay::delegate_primary_selection!(WaylandServerState);
 smithay::delegate_data_device!(WaylandServerState);
 smithay::delegate_xdg_decoration!(WaylandServerState);
 smithay::delegate_xdg_foreign!(WaylandServerState);
+smithay::delegate_xdg_toplevel_icon!(WaylandServerState);
 smithay::delegate_tablet_manager!(WaylandServerState);
 smithay::delegate_viewporter!(WaylandServerState);
 smithay::delegate_fractional_scale!(WaylandServerState);
@@ -1112,3 +1245,4 @@ smithay::delegate_security_context!(WaylandServerState);
 smithay::delegate_xdg_activation!(WaylandServerState);
 smithay::delegate_foreign_toplevel_list!(WaylandServerState);
 smithay::delegate_drm_syncobj!(WaylandServerState);
+smithay::delegate_drm_lease!(WaylandServerState);
