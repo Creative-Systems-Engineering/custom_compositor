@@ -523,6 +523,14 @@ impl SurfaceRenderer {
     pub fn get_all_textures(&self) -> impl Iterator<Item = (u32, &SurfaceTexture)> {
         self.surface_textures.iter().map(|(&id, texture)| (id, texture))
     }
+
+    /// Get reference to the Vulkan instance
+    /// 
+    /// Provides access to the VulkanInstance for memory type queries and other operations.
+    /// Used by compositor renderer for resource allocation.
+    pub fn instance(&self) -> &VulkanInstance {
+        &self.instance
+    }
 }
 
 impl Drop for SurfaceRenderer {

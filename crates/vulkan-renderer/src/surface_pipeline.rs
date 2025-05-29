@@ -15,6 +15,7 @@ pub struct SurfacePipeline {
     descriptor_set_layout: vk::DescriptorSetLayout,
     vertex_shader: vk::ShaderModule,
     fragment_shader: vk::ShaderModule,
+    sampler: vk::Sampler,
 }
 
 /// Push constants for surface rendering
@@ -62,6 +63,9 @@ impl SurfacePipeline {
             render_pass,
         )?;
         
+        // Create texture sampler
+        let sampler = Self::create_sampler(&device)?;
+        
         info!("Surface pipeline created successfully");
         
         Ok(Self {
@@ -71,6 +75,7 @@ impl SurfacePipeline {
             descriptor_set_layout,
             vertex_shader,
             fragment_shader,
+            sampler,
         })
     }
     
@@ -87,6 +92,11 @@ impl SurfacePipeline {
     /// Get the descriptor set layout
     pub fn descriptor_set_layout(&self) -> vk::DescriptorSetLayout {
         self.descriptor_set_layout
+    }
+    
+    /// Get the texture sampler
+    pub fn sampler(&self) -> vk::Sampler {
+        self.sampler
     }
     
     /// Create shader module from SPIR-V bytecode
@@ -334,6 +344,34 @@ impl SurfacePipeline {
             SurfaceVertex { position: [0.0, h], tex_coord: [0.0, 1.0] },
         ]
     }
+    
+    /// Create texture sampler for surface rendering
+    fn create_sampler(device: &VulkanDevice) -> Result<vk::Sampler> {
+        let sampler_info = vk::SamplerCreateInfo {
+            mag_filter: vk::Filter::LINEAR,
+            min_filter: vk::Filter::LINEAR,
+            address_mode_u: vk::SamplerAddressMode::CLAMP_TO_EDGE,
+            address_mode_v: vk::SamplerAddressMode::CLAMP_TO_EDGE,
+            address_mode_w: vk::SamplerAddressMode::CLAMP_TO_EDGE,
+            anisotropy_enable: vk::FALSE,
+            max_anisotropy: 1.0,
+            border_color: vk::BorderColor::INT_OPAQUE_BLACK,
+            unnormalized_coordinates: vk::FALSE,
+            compare_enable: vk::FALSE,
+            compare_op: vk::CompareOp::ALWAYS,
+            mipmap_mode: vk::SamplerMipmapMode::LINEAR,
+            mip_lod_bias: 0.0,
+            min_lod: 0.0,
+            max_lod: 0.0,
+            ..Default::default()
+        };
+        
+        let sampler = unsafe {
+            device.handle().create_sampler(&sampler_info, None)?
+        };
+        
+        Ok(sampler)
+    }
 }
 
 impl Drop for SurfacePipeline {
@@ -344,6 +382,7 @@ impl Drop for SurfacePipeline {
             self.device.handle().destroy_descriptor_set_layout(self.descriptor_set_layout, None);
             self.device.handle().destroy_shader_module(self.vertex_shader, None);
             self.device.handle().destroy_shader_module(self.fragment_shader, None);
+            self.device.handle().destroy_sampler(self.sampler, None);
         }
         debug!("Surface pipeline cleanup complete");
     }

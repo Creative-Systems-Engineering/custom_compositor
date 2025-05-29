@@ -479,26 +479,162 @@ impl CompositorRenderer {
     fn update_surface_vertex_buffer(&mut self, surface_id: u32, width: u32, height: u32) -> Result<()> {
         // Create quad vertices for this surface
         let vertices = SurfacePipeline::create_surface_quad_vertices(width, height);
-        let _vertex_data = unsafe {
+        let vertex_data = unsafe {
             std::slice::from_raw_parts(
                 vertices.as_ptr() as *const u8,
                 std::mem::size_of_val(&vertices),
             )
         };
         
-        // TODO: Implement vertex buffer creation and upload
-        // For now, create placeholder buffer
-        debug!("Creating vertex buffer for surface {} ({}x{})", surface_id, width, height);
+        // Clean up existing vertex buffer if it exists
+        if let (Some(old_buffer), Some(old_memory)) = (
+            self.vertex_buffers.remove(&surface_id),
+            self.vertex_buffer_memories.remove(&surface_id)
+        ) {
+            unsafe {
+                self.device.handle().destroy_buffer(old_buffer, None);
+                self.device.handle().free_memory(old_memory, None);
+            }
+        }
         
+        // Create new vertex buffer
+        let buffer_size = vertex_data.len() as vk::DeviceSize;
+        let buffer_info = vk::BufferCreateInfo {
+            size: buffer_size,
+            usage: vk::BufferUsageFlags::VERTEX_BUFFER,
+            sharing_mode: vk::SharingMode::EXCLUSIVE,
+            ..Default::default()
+        };
+        
+        let buffer = unsafe {
+            self.device.handle().create_buffer(&buffer_info, None)?
+        };
+        
+        // Get memory requirements
+        let mem_requirements = unsafe {
+            self.device.handle().get_buffer_memory_requirements(buffer)
+        };
+        
+        // Find appropriate memory type
+        let memory_type_index = self.find_memory_type(
+            mem_requirements.memory_type_bits,
+            vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
+        )?;
+        
+        // Allocate memory
+        let alloc_info = vk::MemoryAllocateInfo {
+            allocation_size: mem_requirements.size,
+            memory_type_index,
+            ..Default::default()
+        };
+        
+        let memory = unsafe {
+            self.device.handle().allocate_memory(&alloc_info, None)?
+        };
+        
+        // Bind buffer to memory
+        unsafe {
+            self.device.handle().bind_buffer_memory(buffer, memory, 0)?;
+        }
+        
+        // Copy vertex data to buffer
+        unsafe {
+            let mapped_ptr = self.device.handle().map_memory(
+                memory,
+                0,
+                buffer_size,
+                vk::MemoryMapFlags::empty(),
+            )?;
+            
+            std::ptr::copy_nonoverlapping(
+                vertex_data.as_ptr(),
+                mapped_ptr as *mut u8,
+                vertex_data.len(),
+            );
+            
+            self.device.handle().unmap_memory(memory);
+        }
+        
+        // Store the buffer and memory
+        self.vertex_buffers.insert(surface_id, buffer);
+        self.vertex_buffer_memories.insert(surface_id, memory);
+        
+        debug!("Created vertex buffer for surface {} ({}x{}, {} bytes)", surface_id, width, height, buffer_size);
         Ok(())
     }
     
     /// Update descriptor set for a surface texture
     fn update_surface_descriptor_set(&mut self, surface_id: u32) -> Result<()> {
-        // TODO: Implement descriptor set creation and texture binding
-        debug!("Creating descriptor set for surface {}", surface_id);
+        // Get the surface texture
+        let texture = self.surface_renderer.get_surface_texture(surface_id)
+            .ok_or_else(|| CompositorError::runtime("Surface texture not found"))?;
         
+        // Get descriptor pool
+        let descriptor_pool = self.descriptor_pool
+            .ok_or_else(|| CompositorError::runtime("Descriptor pool not initialized"))?;
+        
+        // Get descriptor set layout from surface pipeline
+        let pipeline = self.surface_pipeline.as_ref()
+            .ok_or_else(|| CompositorError::runtime("Surface pipeline not initialized"))?;
+        
+        // Allocate descriptor set
+        let layouts = [pipeline.descriptor_set_layout()];
+        let alloc_info = vk::DescriptorSetAllocateInfo {
+            descriptor_pool,
+            descriptor_set_count: 1,
+            p_set_layouts: layouts.as_ptr(),
+            ..Default::default()
+        };
+        
+        let descriptor_sets = unsafe {
+            self.device.handle().allocate_descriptor_sets(&alloc_info)?
+        };
+        let descriptor_set = descriptor_sets[0];
+        
+        // Update descriptor set with texture
+        let image_info = vk::DescriptorImageInfo {
+            image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+            image_view: texture.image_view,
+            sampler: pipeline.sampler(),
+        };
+        
+        let descriptor_write = vk::WriteDescriptorSet {
+            dst_set: descriptor_set,
+            dst_binding: 0,
+            dst_array_element: 0,
+            descriptor_count: 1,
+            descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+            p_image_info: &image_info,
+            ..Default::default()
+        };
+        
+        unsafe {
+            self.device.handle().update_descriptor_sets(&[descriptor_write], &[]);
+        }
+        
+        // Store the descriptor set
+        self.descriptor_sets.insert(surface_id, descriptor_set);
+        
+        debug!("Created descriptor set for surface {}", surface_id);
         Ok(())
+    }
+    
+    /// Find suitable memory type for allocation
+    fn find_memory_type(&self, type_filter: u32, properties: vk::MemoryPropertyFlags) -> Result<u32> {
+        // Access the instance through surface_renderer since CompositorRenderer doesn't store it directly
+        let mem_properties = unsafe {
+            self.surface_renderer.instance().handle().get_physical_device_memory_properties(self.device.physical_device())
+        };
+        
+        for i in 0..mem_properties.memory_type_count {
+            if (type_filter & (1 << i)) != 0 
+                && mem_properties.memory_types[i as usize].property_flags.contains(properties) 
+            {
+                return Ok(i);
+            }
+        }
+        
+        Err(CompositorError::graphics("Failed to find suitable memory type"))
     }
 }
 
