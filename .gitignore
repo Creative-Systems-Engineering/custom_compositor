@@ -42,5 +42,12 @@ Thumbs.db
 # Documentation build
 /target/doc/
 
-# Manuals and reference documentation
+# Development reference materials (large PDF files, development aids only)
 /Manuals/
+/manuals/
+
+# Scripts for local development/testing only  
+/scripts/check_traffic.sh
+
+# Any other local development scripts
+/scripts/local_*
