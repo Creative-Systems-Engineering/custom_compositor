@@ -44,6 +44,30 @@ impl VulkanInstance {
     }
     
     /// Create a new Vulkan instance with custom application info and extensions
+    /// 
+    /// This flexible constructor allows specifying custom application information and additional
+    /// instance extensions beyond the default set required for compositor operation.
+    /// 
+    /// # Arguments
+    /// * `app_info` - Custom application information including name, version, and API requirements
+    /// * `extensions` - Additional instance extensions to enable beyond compositor defaults
+    /// 
+    /// # Default Extensions Included
+    /// * Surface extension for window management
+    /// * Platform-specific surface extensions (Xlib, Wayland)
+    /// * Debug utilities (in debug builds)
+    /// 
+    /// # Returns
+    /// A configured VulkanInstance ready for device creation and graphics operations.
+    /// 
+    /// # Examples
+    /// ```rust
+    /// let app_info = vk::ApplicationInfo::builder()
+    ///     .application_name(c"my_compositor")
+    ///     .api_version(vk::API_VERSION_1_3)
+    ///     .build();
+    /// let instance = VulkanInstance::new_with_info(&app_info, &[])?;
+    /// ```
     pub fn new_with_info(app_info: &vk::ApplicationInfo, extensions: &[*const i8]) -> Result<Self> {
         let entry = Entry::linked();
         
@@ -108,43 +132,70 @@ impl VulkanInstance {
     }
     
     /// Get a reference to the raw ash Entry
+    /// 
+    /// Provides access to the Vulkan entry point for low-level operations.
+    /// Used by test suites and advanced graphics operations that need direct Vulkan access.
     pub fn entry(&self) -> &Entry {
         &self.entry
     }
     
     /// Get a reference to the raw ash Instance
+    /// 
+    /// Provides access to the Vulkan instance handle for operations requiring direct instance access.
+    /// Essential for device enumeration, surface creation, and other instance-level operations.
     pub fn handle(&self) -> &Instance {
         &self.instance
     }
     
-    /// Get the supported API version
+    /// Get the supported Vulkan API version
+    /// 
+    /// Returns the highest Vulkan API version supported by the system.
+    /// Used for feature detection and compatibility checking.
     pub fn api_version(&self) -> u32 {
         self.api_version
     }
     
-    /// Enumerate physical devices
+    /// Enumerate all available physical devices (GPUs)
+    /// 
+    /// Returns a list of all Vulkan-capable physical devices in the system.
+    /// Essential for GPU selection and capability validation in multi-GPU systems.
+    /// Used by test suites to validate 4K graphics capabilities.
     pub fn enumerate_physical_devices(&self) -> Result<Vec<vk::PhysicalDevice>> {
         let devices = unsafe { self.instance.enumerate_physical_devices() }
             .map_err(|e| CompositorError::graphics(format!("Failed to enumerate physical devices: {:?}", e)))?;
         Ok(devices)
     }
     
-    /// Get physical device properties
+    /// Get comprehensive properties for a physical device
+    /// 
+    /// Returns detailed device properties including limits, features, and capabilities.
+    /// Used for GPU selection, capability validation, and performance optimization.
+    /// Critical for 4K graphics validation and memory allocation planning.
     pub fn get_physical_device_properties(&self, device: vk::PhysicalDevice) -> vk::PhysicalDeviceProperties {
         unsafe { self.instance.get_physical_device_properties(device) }
     }
     
-    /// Get physical device features
+    /// Get available features for a physical device
+    /// 
+    /// Returns the set of optional features supported by the device.
+    /// Used for feature detection and enabling advanced graphics capabilities.
     pub fn get_physical_device_features(&self, device: vk::PhysicalDevice) -> vk::PhysicalDeviceFeatures {
         unsafe { self.instance.get_physical_device_features(device) }
     }
     
-    /// Get physical device memory properties
+    /// Get memory properties for a physical device
+    /// 
+    /// Returns detailed memory heap and type information for optimal memory allocation.
+    /// Critical for 4K framebuffer allocation and performance optimization.
+    /// Used by test suites to validate memory requirements for high-resolution rendering.
     pub fn get_physical_device_memory_properties(&self, device: vk::PhysicalDevice) -> vk::PhysicalDeviceMemoryProperties {
         unsafe { self.instance.get_physical_device_memory_properties(device) }
     }
     
-    /// Get physical device format properties
+    /// Get format properties for a specific image format on a device
+    /// 
+    /// Returns supported operations, tiling modes, and features for image formats.
+    /// Essential for surface format selection and render target compatibility.
     pub fn get_physical_device_format_properties(&self, device: vk::PhysicalDevice, format: vk::Format) -> vk::FormatProperties {
         unsafe { self.instance.get_physical_device_format_properties(device, format) }
     }

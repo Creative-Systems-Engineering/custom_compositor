@@ -33,7 +33,31 @@ impl VulkanDevice {
         Self::new_with_device(instance, physical_device, &[], &[])
     }
     
-    /// Create a new Vulkan device with specific physical device and options
+    /// Create a new Vulkan device with specific physical device and configuration options
+    /// 
+    /// This flexible constructor allows creating a logical device from a pre-selected physical device
+    /// with custom extensions and features. Essential for test suites and advanced configurations
+    /// where automatic device selection is not appropriate.
+    /// 
+    /// # Arguments
+    /// * `instance` - The VulkanInstance containing the physical device
+    /// * `physical_device` - Pre-selected physical device (GPU) to create the logical device from
+    /// * `_extensions` - Device extensions to enable (currently unused, reserved for future features)
+    /// * `_features` - Device features to enable (currently unused, reserved for future features)
+    /// 
+    /// # Device Creation Process
+    /// 1. Finds appropriate graphics and present queue families
+    /// 2. Logs selected GPU information for debugging
+    /// 3. Creates logical device with required queues
+    /// 4. Retrieves queue handles for immediate use
+    /// 
+    /// # Returns
+    /// A configured VulkanDevice ready for rendering operations, memory allocation, and command submission.
+    /// 
+    /// # Used By
+    /// * 4K graphics validation test suite
+    /// * Custom GPU selection scenarios
+    /// * Advanced compositor configurations
     pub fn new_with_device(
         instance: &VulkanInstance, 
         physical_device: vk::PhysicalDevice,
@@ -77,7 +101,28 @@ impl VulkanDevice {
         })
     }
     
-    /// Find graphics and present queue families for a physical device
+    /// Find appropriate graphics and present queue families for a physical device
+    /// 
+    /// Searches through the available queue families to find ones capable of graphics operations
+    /// and presentation. Essential for compositor operation as these queues handle all rendering
+    /// and display output operations.
+    /// 
+    /// # Arguments
+    /// * `instance` - VulkanInstance containing the physical device
+    /// * `physical_device` - Physical device to query for queue families
+    /// 
+    /// # Queue Family Selection Logic
+    /// 1. Enumerates all available queue families on the device
+    /// 2. Finds the first queue family with graphics capability
+    /// 3. Currently uses the same family for present (simplified for testing)
+    /// 4. In production, would verify surface presentation support
+    /// 
+    /// # Returns
+    /// A tuple containing (graphics_queue_family_index, present_queue_family_index)
+    /// 
+    /// # Error Conditions
+    /// Returns error if no graphics-capable queue family is found, indicating the device
+    /// cannot perform the rendering operations required by the compositor.
     fn find_queue_families(
         instance: &VulkanInstance, 
         physical_device: vk::PhysicalDevice
@@ -190,27 +235,52 @@ impl VulkanDevice {
         Ok(device)
     }
     
-    /// Get the logical device handle
+    /// Get reference to the logical device handle
+    /// 
+    /// Provides access to the Vulkan logical device for direct GPU operations.
+    /// Used by rendering operations, memory allocation, and resource creation.
+    /// Essential for test suites and advanced graphics operations.
     pub fn handle(&self) -> &Device {
         &self.device
     }
     
     /// Get the physical device handle
+    /// 
+    /// Returns the underlying physical device (GPU) that this logical device represents.
+    /// Used for capability queries, memory property inspection, and device selection logic.
+    /// Critical for validation tests and hardware capability detection.
     pub fn physical_device(&self) -> vk::PhysicalDevice {
         self.physical_device
     }
     
-    /// Get the graphics queue
+    /// Get the graphics queue handle
+    /// 
+    /// Returns the graphics queue used for rendering commands and GPU operations.
+    /// All rendering operations, command buffer submissions, and graphics workloads
+    /// are submitted through this queue for execution on the GPU.
     pub fn graphics_queue(&self) -> vk::Queue {
         self.graphics_queue
     }
     
-    /// Get the present queue
+    /// Get the presentation queue handle
+    /// 
+    /// Returns the queue used for presenting rendered frames to the display.
+    /// Essential for swapchain operations and getting rendered content to the screen.
+    /// In many cases this is the same as the graphics queue for efficiency.
     pub fn present_queue(&self) -> vk::Queue {
         self.present_queue
     }
     
-    /// Get device name for debugging
+    /// Get human-readable device name for debugging and user information
+    /// 
+    /// Returns the GPU's marketing name as reported by the driver.
+    /// Useful for logging, debugging, and providing user feedback about
+    /// the selected graphics hardware.
+    /// 
+    /// # Examples
+    /// * "NVIDIA GeForce RTX 4080"
+    /// * "AMD Radeon RX 7800 XT"  
+    /// * "Intel Arc A770"
     pub fn get_device_name(&self) -> String {
         unsafe {
             CStr::from_ptr(self.device_properties.device_name.as_ptr())
@@ -219,17 +289,37 @@ impl VulkanDevice {
         }
     }
     
-    /// Get vendor ID
+    /// Get the vendor ID for hardware identification
+    /// 
+    /// Returns the PCI vendor ID for the graphics hardware.
+    /// Used for vendor-specific optimizations and compatibility checks.
+    /// 
+    /// # Common Vendor IDs
+    /// * 0x10DE - NVIDIA
+    /// * 0x1002 - AMD
+    /// * 0x8086 - Intel
     pub fn get_vendor_id(&self) -> u32 {
         self.device_properties.vendor_id
     }
     
-    /// Get device properties
+    /// Get complete device properties for capability inspection
+    /// 
+    /// Returns the full set of device properties including limits, features,
+    /// and hardware specifications. Used for detailed capability analysis
+    /// and performance optimization decisions.
     pub fn properties(&self) -> &vk::PhysicalDeviceProperties {
         &self.device_properties
     }
     
-    /// Wait for device to be idle before cleanup
+    /// Wait for all GPU operations to complete
+    /// 
+    /// Blocks until the GPU has finished all pending operations on this device.
+    /// Critical for safe resource cleanup and ensuring proper synchronization
+    /// before application shutdown or major state changes.
+    /// 
+    /// # Warning
+    /// This is a synchronizing operation that can cause performance hitches.
+    /// Should only be used during cleanup or when explicit synchronization is required.
     pub fn wait_idle(&self) -> Result<()> {
         unsafe {
             self.device.device_wait_idle()?;
@@ -237,7 +327,16 @@ impl VulkanDevice {
         Ok(())
     }
 
-    /// Get device type as string
+    /// Get human-readable device type description
+    /// 
+    /// Returns a descriptive string indicating the type of graphics hardware.
+    /// Useful for performance expectations and capability assumptions.
+    /// 
+    /// # Device Type Classifications
+    /// * **Discrete GPU**: Dedicated graphics card with own memory
+    /// * **Integrated GPU**: CPU-integrated graphics sharing system memory
+    /// * **Virtual GPU**: Virtualized graphics in VM environments
+    /// * **CPU**: Software-only rendering fallback
     pub fn get_device_type(&self) -> String {
         match self.device_properties.device_type {
             vk::PhysicalDeviceType::DISCRETE_GPU => "Discrete GPU".to_string(),
