@@ -27,8 +27,24 @@ impl Clone for DebugUtils {
 }
 
 impl VulkanInstance {
-    /// Create a new Vulkan instance
+    /// Create a new Vulkan instance with default parameters
     pub fn new() -> Result<Self> {
+        // Application info
+        let app_name = CString::new("Custom Compositor")?;
+        let engine_name = CString::new("Custom Engine")?;
+        let app_info = vk::ApplicationInfo::builder()
+            .application_name(&app_name)
+            .application_version(vk::make_api_version(0, 0, 1, 0))
+            .engine_name(&engine_name)
+            .engine_version(vk::make_api_version(0, 0, 1, 0))
+            .api_version(vk::API_VERSION_1_3)
+            .build();
+        
+        Self::new_with_info(&app_info, &[])
+    }
+    
+    /// Create a new Vulkan instance with custom application info and extensions
+    pub fn new_with_info(app_info: &vk::ApplicationInfo, extensions: &[*const i8]) -> Result<Self> {
         let entry = Entry::linked();
         
         // Check API version
@@ -38,24 +54,15 @@ impl VulkanInstance {
         
         info!("Vulkan API version: {}", format_version(api_version));
         
-        // Application info
-        let app_name = CString::new("Custom Compositor")?;
-        let engine_name = CString::new("Custom Engine")?;
-        let app_info = vk::ApplicationInfo {
-            p_application_name: app_name.as_ptr(),
-            application_version: vk::make_api_version(0, 0, 1, 0),
-            p_engine_name: engine_name.as_ptr(),
-            engine_version: vk::make_api_version(0, 0, 1, 0),
-            api_version,
-            ..Default::default()
-        };
-        
         // Required extensions
         let mut extension_names = vec![
             ash::extensions::khr::Surface::name().as_ptr(),
             ash::extensions::khr::XlibSurface::name().as_ptr(),
             ash::extensions::khr::WaylandSurface::name().as_ptr(),
         ];
+        
+        // Add provided extensions
+        extension_names.extend_from_slice(extensions);
         
         // Add debug extensions in debug mode
         let debug_enabled = cfg!(debug_assertions);
@@ -75,14 +82,11 @@ impl VulkanInstance {
             .collect();
         
         // Create instance
-        let create_info = vk::InstanceCreateInfo {
-            p_application_info: &app_info,
-            enabled_layer_count: layer_names_raw.len() as u32,
-            pp_enabled_layer_names: layer_names_raw.as_ptr(),
-            enabled_extension_count: extension_names.len() as u32,
-            pp_enabled_extension_names: extension_names.as_ptr(),
-            ..Default::default()
-        };
+        let create_info = vk::InstanceCreateInfo::builder()
+            .application_info(app_info)
+            .enabled_layer_names(&layer_names_raw)
+            .enabled_extension_names(&extension_names)
+            .build();
         
         let instance = unsafe { entry.create_instance(&create_info, None)? };
         
@@ -101,6 +105,48 @@ impl VulkanInstance {
             debug_utils,
             api_version,
         })
+    }
+    
+    /// Get a reference to the raw ash Entry
+    pub fn entry(&self) -> &Entry {
+        &self.entry
+    }
+    
+    /// Get a reference to the raw ash Instance
+    pub fn handle(&self) -> &Instance {
+        &self.instance
+    }
+    
+    /// Get the supported API version
+    pub fn api_version(&self) -> u32 {
+        self.api_version
+    }
+    
+    /// Enumerate physical devices
+    pub fn enumerate_physical_devices(&self) -> Result<Vec<vk::PhysicalDevice>> {
+        let devices = unsafe { self.instance.enumerate_physical_devices() }
+            .map_err(|e| CompositorError::graphics(format!("Failed to enumerate physical devices: {:?}", e)))?;
+        Ok(devices)
+    }
+    
+    /// Get physical device properties
+    pub fn get_physical_device_properties(&self, device: vk::PhysicalDevice) -> vk::PhysicalDeviceProperties {
+        unsafe { self.instance.get_physical_device_properties(device) }
+    }
+    
+    /// Get physical device features
+    pub fn get_physical_device_features(&self, device: vk::PhysicalDevice) -> vk::PhysicalDeviceFeatures {
+        unsafe { self.instance.get_physical_device_features(device) }
+    }
+    
+    /// Get physical device memory properties
+    pub fn get_physical_device_memory_properties(&self, device: vk::PhysicalDevice) -> vk::PhysicalDeviceMemoryProperties {
+        unsafe { self.instance.get_physical_device_memory_properties(device) }
+    }
+    
+    /// Get physical device format properties
+    pub fn get_physical_device_format_properties(&self, device: vk::PhysicalDevice, format: vk::Format) -> vk::FormatProperties {
+        unsafe { self.instance.get_physical_device_format_properties(device, format) }
     }
     
     fn setup_debug_messenger(entry: &Entry, instance: &Instance) -> Result<DebugUtils> {
@@ -125,27 +171,6 @@ impl VulkanInstance {
             loader: debug_utils_loader,
             messenger: debug_callback,
         })
-    }
-    
-    /// Get the Vulkan instance handle
-    pub fn handle(&self) -> &Instance {
-        &self.instance
-    }
-    
-    /// Get the Vulkan entry
-    pub fn entry(&self) -> &Entry {
-        &self.entry
-    }
-    
-    /// Get API version
-    pub fn get_api_version(&self) -> u32 {
-        self.api_version
-    }
-    
-    /// Enumerate physical devices
-    pub fn enumerate_physical_devices(&self) -> Result<Vec<vk::PhysicalDevice>> {
-        let devices = unsafe { self.instance.enumerate_physical_devices()? };
-        Ok(devices)
     }
 }
 

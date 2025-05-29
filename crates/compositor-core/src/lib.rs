@@ -16,9 +16,11 @@ pub mod input;
 pub mod output;
 pub mod surface;
 pub mod backend;
+pub mod session;
 
 // Re-export core types
 pub use wayland::WaylandServer;
+pub use session::{SessionManager, SessionState};
 pub use backend::Backend;
 
 /// Main compositor instance

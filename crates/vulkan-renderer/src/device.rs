@@ -18,7 +18,7 @@ pub struct VulkanDevice {
 }
 
 impl VulkanDevice {
-    /// Create a new Vulkan device
+    /// Create a new Vulkan device with automatic physical device selection
     pub fn new(instance: &VulkanInstance) -> Result<Self> {
         let physical_devices = instance.enumerate_physical_devices()?;
         
@@ -27,8 +27,22 @@ impl VulkanDevice {
         }
         
         // Select the best physical device
-        let (physical_device, graphics_queue_family, present_queue_family) = 
+        let (physical_device, _graphics_queue_family, _present_queue_family) = 
             Self::select_physical_device(instance, &physical_devices)?;
+        
+        Self::new_with_device(instance, physical_device, &[], &[])
+    }
+    
+    /// Create a new Vulkan device with specific physical device and options
+    pub fn new_with_device(
+        instance: &VulkanInstance, 
+        physical_device: vk::PhysicalDevice,
+        _extensions: &[*const i8],
+        _features: &[vk::PhysicalDeviceFeatures] // Placeholder for future feature selection
+    ) -> Result<Self> {
+        // Find queue families
+        let (graphics_queue_family, present_queue_family) = 
+            Self::find_queue_families(instance, physical_device)?;
         
         // Get device properties
         let device_properties = unsafe {
@@ -61,6 +75,31 @@ impl VulkanDevice {
             present_queue_family,
             device_properties,
         })
+    }
+    
+    /// Find graphics and present queue families for a physical device
+    fn find_queue_families(
+        instance: &VulkanInstance, 
+        physical_device: vk::PhysicalDevice
+    ) -> Result<(u32, u32)> {
+        let queue_families = unsafe {
+            instance.handle().get_physical_device_queue_family_properties(physical_device)
+        };
+        
+        let graphics_family = queue_families
+            .iter()
+            .enumerate()
+            .find(|(_, family)| family.queue_flags.contains(vk::QueueFlags::GRAPHICS))
+            .map(|(index, _)| index as u32);
+        
+        if let Some(graphics_family) = graphics_family {
+            // For now, use the same queue family for present
+            // In a real implementation, we'd check surface support
+            let present_family = graphics_family;
+            Ok((graphics_family, present_family))
+        } else {
+            Err(CompositorError::init("No suitable queue family found"))
+        }
     }
     
     fn select_physical_device(
@@ -185,6 +224,19 @@ impl VulkanDevice {
         self.device_properties.vendor_id
     }
     
+    /// Get device properties
+    pub fn properties(&self) -> &vk::PhysicalDeviceProperties {
+        &self.device_properties
+    }
+    
+    /// Wait for device to be idle before cleanup
+    pub fn wait_idle(&self) -> Result<()> {
+        unsafe {
+            self.device.device_wait_idle()?;
+        }
+        Ok(())
+    }
+
     /// Get device type as string
     pub fn get_device_type(&self) -> String {
         match self.device_properties.device_type {

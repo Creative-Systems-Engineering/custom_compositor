@@ -20,6 +20,9 @@ pub mod surface_renderer;
 pub mod surface_pipeline;
 pub mod compositor_renderer;
 
+#[cfg(test)]
+mod tests;
+
 pub use instance::VulkanInstance;
 pub use device::VulkanDevice;
 pub use swapchain::Swapchain;
@@ -29,8 +32,8 @@ pub use compositor_renderer::CompositorRenderer;
 
 /// Main Vulkan renderer context
 pub struct VulkanRenderer {
-    instance: VulkanInstance,
-    device: VulkanDevice,
+    instance: Option<VulkanInstance>,
+    device: Option<VulkanDevice>,
     swapchain: Option<Swapchain>,
     compositor_renderer: Option<CompositorRenderer>,
 }
@@ -45,8 +48,8 @@ impl VulkanRenderer {
         let compositor_renderer = CompositorRenderer::new(instance.clone(), device.clone())?;
         
         Ok(Self {
-            instance,
-            device,
+            instance: Some(instance),
+            device: Some(device),
             swapchain: None,
             compositor_renderer: Some(compositor_renderer),
         })
@@ -54,7 +57,12 @@ impl VulkanRenderer {
     
     /// Initialize swapchain for a given surface
     pub fn initialize_swapchain(&mut self, surface: ash::vk::SurfaceKHR, width: u32, height: u32) -> Result<()> {
-        let swapchain = Swapchain::new(&self.instance, &self.device, surface, width, height)?;
+        let (instance, device) = match (&self.instance, &self.device) {
+            (Some(instance), Some(device)) => (instance, device),
+            _ => return Err(CompositorError::runtime("Vulkan instance or device not available")),
+        };
+        
+        let swapchain = Swapchain::new(instance, device, surface, width, height)?;
         
         // Initialize compositor renderer with swapchain details
         if let (Some(ref mut compositor_renderer), Some(ref swapchain)) = 
@@ -147,11 +155,21 @@ impl VulkanRenderer {
     
     /// Get renderer information for debugging
     pub fn get_info(&self) -> RendererInfo {
+        let (instance, device) = match (&self.instance, &self.device) {
+            (Some(instance), Some(device)) => (instance, device),
+            _ => return RendererInfo {
+                api_version: 0,
+                device_name: "Not Available".to_string(),
+                vendor_id: 0,
+                device_type: "Unknown".to_string(),
+            },
+        };
+        
         RendererInfo {
-            api_version: self.instance.get_api_version(),
-            device_name: self.device.get_device_name(),
-            vendor_id: self.device.get_vendor_id(),
-            device_type: self.device.get_device_type(),
+            api_version: instance.api_version(),
+            device_name: device.get_device_name(),
+            vendor_id: device.get_vendor_id(),
+            device_type: device.get_device_type(),
         }
     }
 }
@@ -166,12 +184,40 @@ pub struct RendererInfo {
 
 impl Drop for VulkanRenderer {
     fn drop(&mut self) {
-        // Cleanup compositor renderer first
+        tracing::info!("Starting Vulkan renderer cleanup...");
+        
+        // CRITICAL: Wait for device to be idle before destroying anything
+        if let Some(ref device) = self.device {
+            if let Err(e) = device.wait_idle() {
+                tracing::error!("Failed to wait for device idle during cleanup: {}", e);
+            }
+        }
+        
+        // Destroy in reverse order of creation:
+        // 1. High-level renderer (contains command pools, pipelines, etc.)
         if let Some(compositor_renderer) = self.compositor_renderer.take() {
+            tracing::info!("Destroying compositor renderer...");
             drop(compositor_renderer);
         }
         
-        // Cleanup will be handled by individual component Drop implementations
-        tracing::info!("Vulkan renderer shutting down");
+        // 2. Swapchain (contains images, image views, framebuffers)
+        if let Some(swapchain) = self.swapchain.take() {
+            tracing::info!("Destroying swapchain...");
+            drop(swapchain);
+        }
+        
+        // 3. Device (automatically destroys remaining device objects)
+        if let Some(device) = self.device.take() {
+            tracing::info!("Destroying Vulkan device...");
+            drop(device);
+        }
+        
+        // 4. Instance (last to be destroyed)
+        if let Some(instance) = self.instance.take() {
+            tracing::info!("Destroying Vulkan instance...");
+            drop(instance);
+        }
+        
+        tracing::info!("Vulkan renderer cleanup complete");
     }
 }

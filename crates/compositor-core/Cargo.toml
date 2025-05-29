@@ -37,6 +37,8 @@ ash = { workspace = true }
 
 # System programming
 nix = { workspace = true }
+libseat = { workspace = true }
+libc = { workspace = true }
 
 # Utilities
 once_cell = { workspace = true }

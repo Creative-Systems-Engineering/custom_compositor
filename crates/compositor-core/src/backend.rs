@@ -1,4 +1,5 @@
 use compositor_utils::prelude::*;
+use crate::session::SessionManager;
 
 /// Backend type selection
 #[derive(Debug, Clone)]
@@ -14,7 +15,7 @@ pub enum BackendType {
 /// Backend abstraction for different display and input systems
 pub struct Backend {
     backend_type: BackendType,
-    // Will be expanded to include actual backend instances
+    session_manager: Option<SessionManager>,
 }
 
 impl Backend {
@@ -50,29 +51,24 @@ impl Backend {
     
     /// Check if DRM backend is available
     async fn can_use_drm() -> bool {
-        // Check if we have access to DRM devices
-        use std::path::Path;
-        
-        // Look for primary DRM device
-        if Path::new("/dev/dri/card0").exists() {
-            // Try to open it to see if we have permissions
-            match std::fs::OpenOptions::new()
-                .read(true)
-                .write(true)
-                .open("/dev/dri/card0")
-            {
-                Ok(_) => {
-                    debug!("DRM device accessible");
-                    true
-                }
-                Err(e) => {
-                    debug!("DRM device not accessible: {}", e);
-                    false
+        // Try to initialize session manager to check seat availability
+        match SessionManager::new() {
+            Ok(mut session_manager) => {
+                match session_manager.initialize() {
+                    Ok(()) => {
+                        info!("Session manager initialized successfully - DRM backend available");
+                        true
+                    }
+                    Err(e) => {
+                        warn!("Session manager initialization failed: {} - falling back to windowed mode", e);
+                        false
+                    }
                 }
             }
-        } else {
-            debug!("No DRM device found");
-            false
+            Err(e) => {
+                warn!("Could not create session manager: {} - falling back to windowed mode", e);
+                false
+            }
         }
     }
     
@@ -85,6 +81,7 @@ impl Backend {
         
         Ok(Self {
             backend_type: BackendType::Windowed,
+            session_manager: None,
         })
     }
     
@@ -92,13 +89,33 @@ impl Backend {
     async fn init_drm_backend() -> Result<Self> {
         info!("Initializing DRM backend");
         
-        // TODO: Initialize smithay DRM backend
-        // - DRM device management
-        // - libinput integration
-        // - udev monitoring
+        // Initialize session manager for secure DRM access
+        let mut session_manager = SessionManager::new()?;
+        session_manager.initialize()?;
+        
+        info!("Session manager initialized - waiting for seat activation...");
+        
+        // Wait a bit for seat activation
+        for _ in 0..50 { // Wait up to 500ms
+            session_manager.dispatch_events(Some(10))?;
+            if session_manager.is_active() {
+                info!("Seat activated - DRM device access granted");
+                break;
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        }
+        
+        if !session_manager.is_active() {
+            return Err(CompositorError::Backend(
+                "Failed to activate seat within timeout - compositor cannot access DRM devices".to_string()
+            ));
+        }
+        
+        info!("DRM backend initialized successfully with session management");
         
         Ok(Self {
             backend_type: BackendType::Drm,
+            session_manager: Some(session_manager),
         })
     }
     
@@ -120,6 +137,16 @@ impl Backend {
     
     /// Process events for DRM backend
     async fn process_drm_events(&mut self) -> Result<()> {
+        // Process session events to maintain DRM access
+        if let Some(ref mut session_manager) = self.session_manager {
+            session_manager.dispatch_events(Some(1))?; // Non-blocking check
+            
+            if !session_manager.is_active() {
+                warn!("Session deactivated - compositor paused");
+                // In a real implementation, we'd pause rendering and wait for reactivation
+            }
+        }
+        
         // TODO: Process DRM and libinput events
         tokio::task::yield_now().await;
         Ok(())
@@ -128,5 +155,17 @@ impl Backend {
     /// Get backend type
     pub fn backend_type(&self) -> &BackendType {
         &self.backend_type
+    }
+    
+    /// Get DRM file descriptor (if available and active)
+    pub fn get_drm_fd(&self) -> Option<std::os::unix::io::RawFd> {
+        self.session_manager.as_ref()?.get_drm_fd().ok()
+    }
+    
+    /// Check if session is active
+    pub fn is_session_active(&self) -> bool {
+        self.session_manager.as_ref()
+            .map(|sm| sm.is_active())
+            .unwrap_or(false)
     }
 }

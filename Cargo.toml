@@ -80,9 +80,10 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-appender = "0.2"
 
 # System programming
-nix = { version = "0.27", features = ["process", "fs", "mman"] }
+nix = { version = "0.27", features = ["process", "fs", "mman", "user"] }
 libc = "0.2"
 memmap2 = "0.9"
+libseat = "0.2"
 
 # Error handling
 anyhow = "1.0"

@@ -41,6 +41,9 @@ pub enum CompositorError {
     
     #[error("Configuration error: {0}")]
     Configuration(String),
+    
+    #[error("Backend error: {0}")]
+    Backend(String),
 }
 
 /// Specialized Result type for compositor operations

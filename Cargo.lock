@@ -373,6 +373,8 @@ dependencies = [
  "drm-fourcc",
  "futures",
  "glam",
+ "libc",
+ "libseat",
  "nix",
  "once_cell",
  "parking_lot",
@@ -1084,9 +1086,11 @@ version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c23a245bbd5790c690791c4fe6eefafe4c75851226288a71cb657601135aa00c"
 dependencies = [
+ "cc",
  "errno",
  "libseat-sys",
  "log",
+ "pkg-config",
 ]
 
 [[package]]
