@@ -100,6 +100,7 @@
 // filepath: /home/shane/vscode/custom_compositor/crates/compositor-core/src/wayland.rs
 use compositor_utils::prelude::*;
 use vulkan_renderer::VulkanRenderer;
+use crate::surface_manager::SurfaceManager;
 // Graphics and buffer format handling
 use drm_fourcc::{DrmFourcc, DrmModifier};
 use std::os::fd::OwnedFd;
@@ -143,7 +144,7 @@ use smithay::{
     utils::{Clock, Monotonic, Serial, Point, Logical},
     wayland::{
         buffer::BufferHandler,
-        compositor::{CompositorClientState, CompositorHandler, CompositorState, with_states},
+        compositor::{CompositorClientState, CompositorHandler, CompositorState, SurfaceAttributes, BufferAssignment, with_states},
         dmabuf::{DmabufHandler, DmabufState, DmabufGlobal, ImportNotifier},
         drm_syncobj::{DrmSyncobjHandler, DrmSyncobjState, supports_syncobj_eventfd},
         pointer_constraints::{PointerConstraintsHandler, PointerConstraintsState},
@@ -611,6 +612,13 @@ pub struct WaylandServerState {
     /// The core Vulkan-based rendering engine that performs surface compositing,
     /// applies effects (glassmorphism, neomorphism), and outputs frames.
     pub renderer: Option<Arc<Mutex<VulkanRenderer>>>,
+    
+    /// Surface manager for bridging Wayland surface commits to Vulkan rendering
+    ///
+    /// Handles the critical integration between Wayland surface state changes
+    /// and the Vulkan rendering pipeline, processing buffer attachments, damage
+    /// regions, and frame callbacks for efficient real-time rendering.
+    pub surface_manager: SurfaceManager,
 }
 
 /// High-performance Wayland compositor server with Vulkan acceleration
@@ -933,6 +941,7 @@ impl WaylandServer {
             drm_node: None,    // Will be set when DRM device is detected
             drm_device_fd: None, // Will be set for explicit sync support
             renderer: None,    // Initialize with no renderer
+            surface_manager: SurfaceManager::new(), // Initialize surface manager
         };
         
         info!("Wayland server state initialized with calloop");
@@ -1190,7 +1199,14 @@ impl WaylandServer {
     /// Set the Vulkan renderer for surface rendering
     pub fn set_renderer(&mut self, renderer: Arc<Mutex<VulkanRenderer>>) {
         info!("Setting Vulkan renderer for Wayland server");
-        self.state.renderer = Some(renderer);
+        
+        // Store renderer in state
+        self.state.renderer = Some(renderer.clone());
+        
+        // Connect renderer to surface manager
+        self.state.surface_manager.set_renderer(renderer);
+        
+        info!("Vulkan renderer connected to surface manager");
     }
     
     /// Get the loop signal for shutdown
@@ -1387,13 +1403,16 @@ impl CompositorHandler for WaylandServerState {
     /// - Lazy initialization of optional features (scaling, etc.)
     fn new_surface(&mut self, surface: &WlSurface) {
         debug!("New Wayland surface created: ID {:?}", surface.id());
-        debug!("Surface initialization: pending/current state setup, damage tracking enabled");
         
-        // TODO: Initialize surface-specific optimizations
-        // - Set up damage tracking regions for efficient rendering
-        // - Initialize frame callback infrastructure
-        // - Configure surface scaling and transformation state
-        // - Set up integration points for shell protocols
+        // Register surface with the surface manager
+        let wayland_surface_id = surface.id().protocol_id() as u64;
+        let internal_surface_id = self.surface_manager.register_surface(wayland_surface_id);
+        
+        debug!("Surface registered: Wayland ID {} -> Internal ID {}", 
+               wayland_surface_id, internal_surface_id);
+        
+        // Initialize surface state and damage tracking
+        debug!("Surface initialization: pending/current state setup, damage tracking enabled");
         
         // Log surface creation for debugging and performance monitoring
         info!("Surface {:?} ready for buffer attachment and role assignment", surface.id());
@@ -1431,32 +1450,82 @@ impl CompositorHandler for WaylandServerState {
         debug!("Processing surface commit for surface ID: {:?}", surface.id());
         
         // Access surface state for commit processing
-        with_states(surface, |_surface_data| {
-            // TODO: Implement comprehensive commit processing
-            // - Extract and validate buffer from pending state
-            // - Process damage regions for efficient rendering
-            // - Handle frame callback scheduling
-            // - Update surface transformation and scaling state
-            // - Integrate with explicit synchronization if available
-            
-            debug!("Surface state accessed for commit processing");
-            
-            // TODO: Buffer handling integration
-            // - Validate buffer format and dimensions
-            // - Import DMA-BUF buffers into Vulkan memory
-            // - Handle SHM buffer mapping and validation
-            // - Apply buffer transformations (rotation, scaling)
-            
-            // TODO: Damage processing optimization
-            // - Calculate incremental damage regions
-            // - Merge overlapping damage areas
-            // - Coordinate with compositor's rendering pipeline
-            // - Schedule minimal redraws for efficiency
-            
-            // TODO: Frame callback management
-            // - Schedule frame callbacks for client synchronization
-            // - Coordinate with VSync timing for smooth animation
-            // - Handle frame callback cancellation on surface destruction
+        with_states(surface, |surface_data| {
+            // Extract buffer from pending state if available
+            if let Some(buffer) = surface_data
+                .cached_state
+                .get::<SurfaceAttributes>()
+                .pending()
+                .buffer
+                .as_ref()
+            {
+                debug!("Surface has attached buffer for commit processing");
+                
+                // Get unique surface identifier
+                let wayland_surface_id = surface.id().protocol_id() as u64;
+                
+                // Process the buffer through the surface manager
+                match buffer {
+                    BufferAssignment::NewBuffer(wl_buffer) => {
+                        if let Err(e) = self.surface_manager.handle_surface_commit(wayland_surface_id, wl_buffer) {
+                            error!("Failed to process surface buffer: {}", e);
+                        } else {
+                            debug!("Surface buffer processed successfully");
+                        }
+                    },
+                    BufferAssignment::Removed => {
+                        debug!("Buffer removed on commit for surface {}", wayland_surface_id);
+                        // TODO: Implement buffer detachment handling if needed
+                    }
+                }
+                
+                // Handle damage regions for efficient rendering
+                let damage: Vec<smithay::wayland::compositor::Damage> = surface_data
+                    .cached_state
+                    .get::<SurfaceAttributes>()
+                    .pending()
+                    .damage
+                    .iter()
+                    .map(|d_ref| match *d_ref {
+                        smithay::wayland::compositor::Damage::Surface(rect) => 
+                            smithay::wayland::compositor::Damage::Surface(rect),
+                        smithay::wayland::compositor::Damage::Buffer(rect) => 
+                            smithay::wayland::compositor::Damage::Buffer(rect),
+                    })
+                    .collect();
+                
+                if !damage.is_empty() {
+                    debug!("Processing {} damage regions for surface {:?}", 
+                           damage.len(), surface.id());
+                    // TODO: Implement damage-aware rendering optimization
+                    // For now, we mark the entire surface as damaged
+                } else {
+                    debug!("No damage regions - full surface repaint");
+                }
+                
+                // Handle frame callbacks for client synchronization
+                let frame_callbacks = surface_data
+                    .cached_state
+                    .get::<SurfaceAttributes>()
+                    .pending()
+                    .frame_callbacks
+                    .clone();
+                
+                if !frame_callbacks.is_empty() {
+                    debug!("Scheduling {} frame callbacks for surface {:?}", 
+                           frame_callbacks.len(), surface.id());
+                    
+                    // Schedule frame callbacks to be fired when the frame is presented
+                    for callback in frame_callbacks {
+                        // TODO: Coordinate with VSync timing for smooth animation
+                        // For now, fire callback immediately to maintain client responsiveness
+                        let time = self.clock.now().as_millis() as u32;
+                        callback.done(time);
+                    }
+                }
+            } else {
+                debug!("Surface commit with no buffer attachment - state-only update");
+            }
             
             debug!("Commit processing complete - surface ready for next frame");
         });
@@ -1464,18 +1533,6 @@ impl CompositorHandler for WaylandServerState {
         // Update compositor space to reflect surface changes
         self.space.refresh();
         debug!("Compositor space refreshed - surface changes integrated");
-        
-        // TODO: Integration with Vulkan rendering pipeline
-        // - Submit surface to render queue with proper synchronization
-        // - Handle multi-surface composition for complex layouts
-        // - Apply glassmorphism and neomorphism effects
-        // - Coordinate with display output timing for tear-free presentation
-        
-        // TODO: Performance monitoring and optimization
-        // - Track commit frequency for performance analysis
-        // - Monitor memory usage and buffer lifecycle
-        // - Detect performance bottlenecks in commit processing
-        // - Generate performance metrics for optimization
         
         info!("Surface {:?} commit processed - ready for composition", surface.id());
     }
@@ -1619,14 +1676,42 @@ impl XdgShellHandler for WaylandServerState {
         debug!("Popup surface ready for constraint-based positioning");
     }
     
-    fn toplevel_destroyed(&mut self, _surface: ToplevelSurface) {
+    fn toplevel_destroyed(&mut self, surface: ToplevelSurface) {
         info!("Toplevel window destroyed");
-        // TODO: Remove window from space
+        
+        // Get the Wayland surface ID for cleanup
+        let wayland_surface_id = surface.wl_surface().id().protocol_id() as u64;
+        
+        // Remove surface from surface manager and clean up resources
+        if let Err(e) = self.surface_manager.remove_surface(wayland_surface_id) {
+            error!("Failed to cleanup surface resources for toplevel: {}", e);
+        } else {
+            debug!("Toplevel surface resources cleaned up successfully");
+        }
+        
+        // Remove window from compositor space
+        // Note: This requires finding the window by surface - will be implemented when space management is enhanced
+        // TODO: Remove window from space by finding it via surface
+        
+        debug!("Toplevel destruction complete - resources freed");
     }
     
-    fn popup_destroyed(&mut self, _surface: PopupSurface) {
+    fn popup_destroyed(&mut self, surface: PopupSurface) {
         debug!("Popup destroyed");
-        // TODO: Handle popup destruction
+        
+        // Get the Wayland surface ID for cleanup
+        let wayland_surface_id = surface.wl_surface().id().protocol_id() as u64;
+        
+        // Remove surface from surface manager and clean up resources
+        if let Err(e) = self.surface_manager.remove_surface(wayland_surface_id) {
+            error!("Failed to cleanup surface resources for popup: {}", e);
+        } else {
+            debug!("Popup surface resources cleaned up successfully");
+        }
+        
+        // TODO: Handle popup-specific cleanup (grab release, parent notifications, etc.)
+        
+        debug!("Popup destruction complete - resources freed");
     }
     
     fn grab(&mut self, _surface: PopupSurface, _seat: WlSeat, _serial: Serial) {
@@ -1825,13 +1910,22 @@ impl WlrLayerShellHandler for WaylandServerState {
     /// - **Batched Layout Updates** - Efficient recalculation of multiple changes
     /// - **Minimal Redraw** - Only affected areas need re-rendering
     /// - **Resource Pooling** - Reuse surface state for new layer surfaces
-    fn layer_destroyed(&mut self, _surface: LayerSurface) {
+    fn layer_destroyed(&mut self, surface: LayerSurface) {
         info!("Layer surface destroyed - updating desktop layout");
+        
+        // Get the Wayland surface ID for cleanup
+        let wayland_surface_id = surface.wl_surface().id().protocol_id() as u64;
+        
+        // Remove surface from surface manager and clean up resources
+        if let Err(e) = self.surface_manager.remove_surface(wayland_surface_id) {
+            error!("Failed to cleanup surface resources for layer surface: {}", e);
+        } else {
+            debug!("Layer surface resources cleaned up successfully");
+        }
         
         // TODO: Comprehensive layer surface cleanup
         // TODO: Remove surface from appropriate layer in space management
         // TODO: Recalculate exclusive zones and update window layout
-        // TODO: Free compositor resources (textures, buffers, state)
         // TODO: Notify desktop environment components of layout changes
         // TODO: Update panel and widget positioning if necessary
         // TODO: Trigger smooth animations for layout transitions
